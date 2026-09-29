@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obby Game - End Game & Background</title>
+    <style>
+        body { margin: 0; background-color: #111; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        #game-container { position: relative; width: 360px; height: 640px; border: 4px solid #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 0 30px rgba(0, 229, 255, 0.4); background-color: #0f0c29; }
+        canvas { display: block; }
+        
+        #ui { position: absolute; top: 15px; left: 15px; right: 15px; display: none; justify-content: space-between; font-weight: bold; font-size: 16px; color: white; text-shadow: 1px 1px 2px black; z-index: 10; }
+        
+        .controls { position: absolute; bottom: 20px; width: 100%; display: none; justify-content: space-evenly; z-index: 10; }
+        button.ctrl-btn { width: 60px; height: 60px; border-radius: 50%; font-size: 20px; border: none; background: rgba(255,255,255,0.3); color: white; font-weight: bold; cursor: pointer; user-select: none; touch-action: manipulation; transition: background 0.1s; border: 2px solid rgba(255,255,255,0.5); }
+        button.ctrl-btn:active { background: rgba(0, 229, 255, 0.8); color: black; border-color: #00e5ff; }
+
+        /* พื้นหลังหน้า Start */
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 20; }
+        #startScreen h1 { margin: 0; font-size: 40px; color: #00e5ff; text-shadow: 0 0 15px #00e5ff; text-align: center; }
+        #startScreen p { color: #ccc; margin-top: 15px; font-size: 14px; text-align: center; line-height: 1.6; }
+        
+        /* พื้นหลังหน้า End Game สรุปผล */
+        #endScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #4b134f 0%, #c94b4b 100%); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 30; }
+        #endScreen h1 { margin: 0; font-size: 42px; color: #ffd700; text-shadow: 0 0 20px #ffaa00; text-align: center; }
+        .stats-box { background: rgba(0,0,0,0.5); padding: 20px; border-radius: 15px; margin: 20px 0; border: 2px solid #ffd700; width: 70%; text-align: center; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
+        .stats-box p { margin: 10px 0; font-size: 20px; font-weight: bold; color: white; }
+        .stats-box span { color: #00ffcc; font-size: 24px; }
+        .stats-box .score-val { color: #ff3333; font-size: 28px; text-shadow: 1px 1px 2px white; }
+
+        .btn-action { margin-top: 20px; padding: 15px 40px; font-size: 20px; font-weight: bold; border: none; border-radius: 30px; background: #00e5ff; color: #111; cursor: pointer; box-shadow: 0 5px 15px rgba(0, 229, 255, 0.4); transition: transform 0.2s, background 0.2s; }
+        .btn-action:active { transform: scale(0.95); }
+        #btnRestart { background: #ffd700; box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4); }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="360" height="640"></canvas>
+        <div id="ui">
+            <span id="levelText">Stage 1</span>
+            <span id="timerText">Time: 0.00s</span>
+        </div>
+        <div class="controls" id="controlsDiv">
+            <button class="ctrl-btn" id="btnLeft">←</button>
+            <button class="ctrl-btn" id="btnJump">JUMP</button>
+            <button class="ctrl-btn" id="btnRight">→</button>
+        </div>
+
+        <!-- หน้าจอ Start -->
+        <div id="startScreen">
+            <h1>OBBY<br>SPEEDRUN</h1>
+            <p>Controls: WASD / Arrows / On-screen<br>Avoid Red Lava. Reach the Gold Portal!</p>
+            <button class="btn-action" id="btnStart">START GAME</button>
+        </div>
+
+        <!-- หน้าจอ End Game สรุปผล -->
+        <div id="endScreen">
+            <h1>MISSION<br>ACCOMPLISHED!</h1>
+            <div class="stats-box">
+                <p>TOTAL TIME</p>
+                <span id="finalTimeDisplay">0.00s</span>
+                <p style="margin-top:20px;">FINAL SCORE</p>
+                <span class="score-val" id="finalScoreDisplay">0</span>
+            </div>
+            <button class="btn-action" id="btnRestart">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const levelText = document.getElementById('levelText');
+        const timerText = document.getElementById('timerText');
+        const uiDiv = document.getElementById('ui');
+        const controlsDiv = document.getElementById('controlsDiv');
+        const startScreen = document.getElementById('startScreen');
+        const endScreen = document.getElementById('endScreen');
+
+        // ================= ระบบเสียง =================
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if (type === 'jump') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'land') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(80, now);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'death') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'clear') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(300, now); osc.frequency.setValueAtTime(400, now + 0.1); osc.frequency.setValueAtTime(600, now + 0.2);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'win') {
+                osc.type = 'square'; [400, 500, 600, 800, 1000].forEach((freq, i) => { osc.frequency.setValueAtTime(freq, now + i * 0.1); });
+                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.6);
+                osc.start(now); osc.stop(now + 0.6);
+            }
+        }
+
+        // ================= สร้างดาวเป็นพื้นหลัง Parallax =================
+        const stars = Array.from({length: 80}, () => ({
+            x: Math.random() * 360,
+            y: Math.random() * 2000, // กระจายดาวในแกน Y ให้ครอบคลุมความสูงด่าน
+            size: Math.random() * 2 + 1,
+            opacity: Math.random()
+        }));
+
+        let gameState = 'MENU'; 
+        let currentLevel = 0;
+        let startTime = 0;
+        let totalElapsedTime = 0;
+        let finalScore = 0;
+        let cameraY = 0;
+
+        const keys = { left: false, right: false, jump: false };
+        const bindKey = (e, state) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = state;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = state;
+            if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.jump = state;
+        };
+        window.addEventListener('keydown', e => bindKey(e, true));
+        window.addEventListener('keyup', e => bindKey(e, false));
+
+        const setupBtn = (id, key) => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('mousedown', () => keys[key] = true);
+            btn.addEventListener('mouseup', () => keys[key] = false);
+            btn.addEventListener('mouseleave', () => keys[key] = false);
+            btn.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
+            btn.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+        };
+        setupBtn('btnLeft', 'left'); setupBtn('btnRight', 'right'); setupBtn('btnJump', 'jump');
+
+        document.getElementById('btnStart').addEventListener('click', () => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            startScreen.style.display = 'none';
+            uiDiv.style.display = 'flex';
+            controlsDiv.style.display = 'flex';
+            startGame();
+        });
+
+        document.getElementById('btnRestart').addEventListener('click', () => {
+            endScreen.style.display = 'none';
+            uiDiv.style.display = 'flex';
+            controlsDiv.style.display = 'flex';
+            startGame();
+        });
+
+        const player = {
+            x: 0, y: 0, w: 20, h: 20, color: '#00e5ff',
+            dx: 0, dy: 0, speed: 4.5, jumpPower: -12,
+            gravity: 0.45, grounded: false, currentPlatform: null
+        };
+
+        let levelObjects = []; 
+        const levelsData = [
+            { // ด่าน 1
+                height: 640, spawnX: 40, spawnY: 550,
+                objects: [
+                    { x: 0, y: 580, w: 360, h: 60, type: 'ground' },
+                    { x: 120, y: 480, w: 60, h: 10, type: 'ground' },
+                    { x: 220, y: 380, w: 60, h: 10, type: 'ground' },
+                    { x: 100, y: 280, w: 60, h: 10, type: 'ground' },
+                    { x: 200, y: 180, w: 60, h: 10, type: 'ground' },
+                    { x: 140, y: 80, w: 80, h: 15, type: 'goal' }
+                ]
+            },
+            { // ด่าน 2
+                height: 1200, spawnX: 40, spawnY: 1110,
+                objects: [
+                    { x: 0, y: 1140, w: 100, h: 60, type: 'ground' },
+                    { x: 100, y: 1180, w: 260, h: 20, type: 'lava' },
+                    { x: 150, y: 1040, w: 50, h: 10, type: 'ground' },
+                    { x: 50, y: 930, w: 60, h: 10, type: 'ground', moving: true, speedX: 1.5, minX: 20, maxX: 200 },
+                    { x: 250, y: 820, w: 50, h: 10, type: 'ground' },
+                    { x: 150, y: 710, w: 60, h: 10, type: 'ground', moving: true, speedX: -2.5, minX: 50, maxX: 300 },
+                    { x: 50, y: 600, w: 40, h: 10, type: 'ground' },
+                    { x: 180, y: 490, w: 40, h: 10, type: 'ground' },
+                    { x: 250, y: 380, w: 40, h: 10, type: 'ground' },
+                    { x: 120, y: 270, w: 40, h: 10, type: 'ground' },
+                    { x: 200, y: 160, w: 40, h: 10, type: 'ground' },
+                    { x: 140, y: 60, w: 80, h: 15, type: 'goal' }
+                ]
+            },
+            { // ด่าน 3
+                height: 1800, spawnX: 40, spawnY: 1720,
+                objects: [
+                    { x: 0, y: 1750, w: 100, h: 50, type: 'ground' },
+                    { x: 0, y: 1790, w: 360, h: 10, type: 'lava' },
+                    { x: 150, y: 1640, w: 40, h: 10, type: 'ground' },
+                    { x: 270, y: 1530, w: 40, h: 10, type: 'ground' },
+                    { x: 100, y: 1420, w: 40, h: 10, type: 'ground', moving: true, speedX: 2, minX: 50, maxX: 250 },
+                    { x: 40, y: 1310, w: 40, h: 10, type: 'ground' },
+                    { x: 160, y: 1200, w: 30, h: 10, type: 'ground' },
+                    { x: 250, y: 1090, w: 30, h: 10, type: 'ground' },
+                    { x: 50, y: 1030, w: 50, h: 15, type: 'lava', moving: true, speedX: 3.5, minX: 20, maxX: 220 },
+                    { x: 100, y: 980, w: 30, h: 10, type: 'ground' },
+                    { x: 220, y: 870, w: 30, h: 10, type: 'ground' },
+                    { x: 120, y: 760, w: 40, h: 10, type: 'ground', moving: true, speedX: 1.5, minX: 100, maxX: 300 },
+                    { x: 50, y: 650, w: 30, h: 10, type: 'ground' },
+                    { x: 150, y: 540, w: 30, h: 10, type: 'ground' },
+                    { x: 260, y: 430, w: 30, h: 10, type: 'ground' },
+                    { x: 140, y: 320, w: 30, h: 10, type: 'ground' },
+                    { x: 220, y: 210, w: 30, h: 10, type: 'ground' },
+                    { x: 120, y: 100, w: 30, h: 10, type: 'ground' },
+                    { x: 140, y: 40, w: 80, h: 15, type: 'goal' }
+                ]
+            }
+        ];
+
+        function initLevel() {
+            let data = levelsData[currentLevel];
+            levelObjects = data.objects.map(obj => ({...obj}));
+            player.x = data.spawnX; player.y = data.spawnY;
+            player.dx = 0; player.dy = 0; player.currentPlatform = null;
+            levelText.innerText = `Stage ${currentLevel + 1} / 3`;
+            playSound('clear'); 
+        }
+
+        function startGame() {
+            currentLevel = 0;
+            startTime = Date.now();
+            initLevel();
+            gameState = 'PLAYING';
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') {
+                if (keys.jump && gameState !== 'MENU' && gameState !== 'GAME_CLEAR') {
+                    if (gameState === 'GAMEOVER') startGame();
+                    else if (gameState === 'STAGE_CLEAR') {
+                        currentLevel++; initLevel(); gameState = 'PLAYING';
+                    }
+                    keys.jump = false;
+                }
+                return;
+            }
+
+            totalElapsedTime = (Date.now() - startTime) / 1000;
+            timerText.innerText = `Time: ${totalElapsedTime.toFixed(2)}s`;
+            let lvlData = levelsData[currentLevel];
+
+            for (let rect of levelObjects) {
+                if (rect.moving) {
+                    rect.x += rect.speedX;
+                    if (rect.x <= rect.minX || rect.x + rect.w >= rect.maxX) rect.speedX *= -1;
+                }
+            }
+
+            if (keys.left) player.dx = -player.speed;
+            else if (keys.right) player.dx = player.speed;
+            else player.dx = 0;
+
+            if (player.currentPlatform && player.currentPlatform.moving) {
+                player.dx += player.currentPlatform.speedX;
+            }
+
+            if (keys.jump && player.grounded) {
+                player.dy = player.jumpPower; player.grounded = false; player.currentPlatform = null; playSound('jump');
+            }
+
+            player.dy += player.gravity; player.x += player.dx; player.y += player.dy;
+
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.w > canvas.width) player.x = canvas.width - player.w;
+            if (player.y > lvlData.height + 50) { playSound('death'); gameState = 'GAMEOVER'; }
+
+            let wasGrounded = player.grounded;
+            player.grounded = false; player.currentPlatform = null;
+
+            for (let rect of levelObjects) {
+                if (player.x < rect.x + rect.w && player.x + player.w > rect.x &&
+                    player.y < rect.y + rect.h && player.y + player.h > rect.y) {
+                    
+                    if (rect.type === 'lava') {
+                        playSound('death'); gameState = 'GAMEOVER';
+                    } else if (rect.type === 'goal') {
+                        if (currentLevel < levelsData.length - 1) {
+                            playSound('clear'); gameState = 'STAGE_CLEAR';
+                        } else {
+                            playSound('win');
+                            let timePenalty = Math.floor(totalElapsedTime * 100);
+                            finalScore = Math.max(0, 30000 - timePenalty);
+                            
+                            // นำข้อมูลไปแสดงในหน้า End Screen
+                            document.getElementById('finalTimeDisplay').innerText = `${totalElapsedTime.toFixed(2)}s`;
+                            document.getElementById('finalScoreDisplay').innerText = finalScore.toLocaleString();
+                            
+                            // ซ่อน UI สลับไปแสดงหน้า End Screen
+                            uiDiv.style.display = 'none';
+                            controlsDiv.style.display = 'none';
+                            endScreen.style.display = 'flex';
+                            
+                            gameState = 'GAME_CLEAR';
+                        }
+                    } else if (rect.type === 'ground') {
+                        if (player.dy > 0 && (player.y + player.h - player.dy) <= rect.y + 12) {
+                            player.grounded = true; player.currentPlatform = rect; player.dy = 0; player.y = rect.y - player.h;
+                            if (!wasGrounded) playSound('land'); 
+                        } else if (player.dy < 0 && (player.y - player.dy) >= rect.y + rect.h - 5) {
+                            player.dy = 0; player.y = rect.y + rect.h;
+                        }
+                    }
+                }
+            }
+
+            let targetCameraY = player.y - canvas.height / 2;
+            targetCameraY = Math.max(0, Math.min(targetCameraY, lvlData.height - canvas.height));
+            cameraY += (targetCameraY - cameraY) * 0.1;
+        }
+
+        function draw() {
+            // วาดพื้นหลัง Gradient อวกาศ
+            let bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bgGradient.addColorStop(0, '#0f0c29');
+            bgGradient.addColorStop(0.5, '#302b63');
+            bgGradient.addColorStop(1, '#111');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (gameState === 'MENU' || gameState === 'GAME_CLEAR') return;
+
+            // วาดดวงดาว (Parallax Effect เลื่อนช้ากว่ากล้อง)
+            stars.forEach(star => {
+                let screenY = (star.y - cameraY * 0.3) % 2000;
+                if (screenY < 0) screenY += 2000;
+                if (screenY < canvas.height) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+                    ctx.fillRect(star.x, screenY, star.size, star.size);
+                }
+            });
+
+            ctx.save();
+            ctx.translate(0, -cameraY);
+
+            // วาดเส้นประแสดงกริดอวกาศ
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.beginPath();
+            for(let i = 0; i <= levelsData[currentLevel].height; i += 100) { ctx.moveTo(0, i); ctx.lineTo(360, i); }
+            ctx.stroke();
+
+            for (let rect of levelObjects) {
+                if (rect.type === 'ground') ctx.fillStyle = rect.moving ? '#7b8da3' : '#4e5a66';
+                if (rect.type === 'lava') ctx.fillStyle = rect.moving ? '#ff1100' : '#d93838';
+                if (rect.type === 'goal') {
+                    ctx.fillStyle = '#ffd700';
+                    ctx.shadowBlur = 20; ctx.shadowColor = '#ffd700'; // เพิ่มแสงเงาให้เส้นชัย
+                }
+                ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+                ctx.shadowBlur = 0; // รีเซ็ตเงา
+                
+                if(rect.type === 'ground') {
+                    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                    ctx.fillRect(rect.x, rect.y, rect.w, 4); // ขอบ 3D ด้านบนแท่น
+                }
+            }
+
+            // วาดตัวละคร
+            ctx.fillStyle = player.color;
+            ctx.shadowBlur = 15; ctx.shadowColor = player.color;
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.shadowBlur = 0;
+            ctx.restore();
+
+            ctx.textAlign = 'center';
+            if (gameState === 'GAMEOVER') {
+                ctx.fillStyle = 'rgba(20, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff4444'; ctx.font = 'bold 40px Arial'; ctx.fillText('WASTED!', canvas.width/2, 300);
+                ctx.fillStyle = 'white'; ctx.font = '16px Arial'; ctx.fillText('Tap JUMP to Restart Stage', canvas.width/2, 340);
+            } else if (gameState === 'STAGE_CLEAR') {
+                ctx.fillStyle = 'rgba(0, 50, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#00ff88'; ctx.font = 'bold 36px Arial'; ctx.fillText('STAGE CLEARED!', canvas.width/2, 300);
+                ctx.fillStyle = 'white'; ctx.font = '16px Arial'; ctx.fillText('Tap JUMP for Next Stage', canvas.width/2, 340);
+            }
+        }
+
+        function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+        gameLoop();
+    </script>
+</body>
+</html>
