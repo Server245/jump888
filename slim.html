@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Slime Dash - Fixed Bats</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
+        
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0f172a;
+            font-family: 'Nunito', sans-serif;
+            touch-action: none; /* ป้องกันการเลื่อนหน้าจอบนมือถือ */
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background: linear-gradient(to bottom, #1e293b 0%, #0f172a 100%);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            cursor: pointer;
+        }
+
+        .ui-layer {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .ui-content {
+            pointer-events: auto;
+        }
+
+        .btn {
+            background: linear-gradient(to bottom, #10b981, #059669);
+            border-bottom: 5px solid #047857;
+            transition: transform 0.1s, border-bottom 0.1s;
+        }
+        .btn:active {
+            transform: translateY(5px);
+            border-bottom: 0px solid #047857;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+        <!-- HUD: Score & Coins -->
+        <div id="hud" class="absolute top-0 left-0 w-full p-4 pointer-events-none hidden flex justify-between items-start z-10">
+            <div class="bg-black/60 text-white px-4 py-2 rounded-xl border border-white/20 backdrop-blur shadow-lg">
+                <span class="text-gray-400 text-xs tracking-wider">DISTANCE</span><br>
+                <span id="scoreText" class="text-2xl font-black text-white">0 m</span>
+            </div>
+            <div class="bg-black/60 text-white px-4 py-2 rounded-xl border border-yellow-500/50 backdrop-blur shadow-lg text-right">
+                <span class="text-yellow-400/80 text-xs tracking-wider">COINS</span><br>
+                <span id="coinText" class="text-2xl font-black text-yellow-400 flex items-center gap-1 justify-end">
+                    <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path fill="#b45309" d="M12 6v12m-3-3h6m-6-6h6"></path></svg>
+                    0
+                </span>
+            </div>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="startScreen" class="ui-layer bg-black/80 backdrop-blur-sm z-20">
+            <div class="ui-content bg-slate-800 p-8 rounded-3xl shadow-2xl text-center max-w-sm w-11/12 border-4 border-emerald-500">
+                <h1 class="text-5xl font-black text-emerald-400 mb-2 drop-shadow-lg">Slime Dash</h1>
+                <p class="text-slate-300 font-bold mb-6 tracking-wide">Dungeon Escape</p>
+                
+                <div class="bg-slate-900 p-4 rounded-xl mb-6 text-left text-sm text-slate-300 border border-slate-700 shadow-inner">
+                    <h3 class="font-bold text-emerald-400 mb-3 flex items-center gap-2">
+                        🎮 How to Play:
+                    </h3>
+                    <ul class="space-y-3">
+                        <li class="flex items-center gap-3">
+                            <span class="bg-slate-700 text-white px-2 py-1 rounded shadow text-xs font-bold border border-slate-600">TAP</span> 
+                            <span>Quick tap to <strong>Jump</strong></span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <span class="bg-slate-700 text-white px-2 py-1 rounded shadow text-xs font-bold border border-slate-600">HOLD</span> 
+                            <span>Hold to <strong>Slide</strong> under Bats!</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <button id="startBtn" class="btn text-white font-black text-xl py-4 px-10 rounded-2xl w-full shadow-lg tracking-wider">
+                    PLAY NOW
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="ui-layer bg-black/90 backdrop-blur-md hidden z-20">
+            <div class="ui-content bg-slate-800 p-8 rounded-3xl shadow-2xl text-center max-w-sm w-11/12 border-4 border-red-500">
+                <h1 class="text-5xl font-black text-red-500 mb-2">GAME OVER</h1>
+                
+                <div class="my-6 grid grid-cols-2 gap-3">
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
+                        <p class="text-slate-400 text-xs font-bold tracking-wider">DISTANCE</p>
+                        <p id="finalScore" class="text-3xl font-black text-emerald-400">0m</p>
+                    </div>
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
+                        <p class="text-yellow-600 text-xs font-bold tracking-wider">COINS</p>
+                        <p id="finalCoins" class="text-3xl font-black text-yellow-500">0</p>
+                    </div>
+                </div>
+
+                <button id="restartBtn" class="btn text-white font-black text-xl py-4 px-10 rounded-2xl w-full shadow-lg tracking-wider">
+                    TRY AGAIN
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const hud = document.getElementById('hud');
+        const scoreText = document.getElementById('scoreText');
+        const coinText = document.getElementById('coinText');
+
+        // Game Constants
+        const WIDTH = 800;
+        const HEIGHT = 400;
+        const FLOOR_Y = 340; // Ground Level
+        
+        // Game State Variables
+        let state = 'START'; 
+        let frame = 0;
+        let animationReq;
+        
+        let distance = 0;
+        let coins = 0;
+        let speed = 7.5;
+        const MAX_SPEED = 20;
+        const SPEED_INC = 0.002;
+
+        let obstacles = [];
+        let collectibles = [];
+        let particles = [];
+
+        // Input Handling Variables
+        let isHolding = false;
+        let touchStartTime = 0;
+        let inputTimer = null;
+        const HOLD_THRESHOLD = 120; // ms
+
+        // Responsive Canvas Setup
+        function resize() {
+            const container = document.getElementById('game-container');
+            const ratio = WIDTH / HEIGHT;
+            let w = container.clientWidth;
+            let h = container.clientHeight;
+            if (w / h > ratio) w = h * ratio;
+            else h = w / ratio;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const player = {
+            x: 100,
+            y: 0,
+            w: 44,       // Visual Width
+            h: 44,       // Visual Height
+            baseH: 44,   // Normal height
+            slideH: 20,  // CRITICAL: Height when sliding (must be small enough to pass under bat)
+            vy: 0,
+            gravity: 1.2,
+            jumpPower: -15, // Max Jump Height ~ 93px (Peak Y = 247)
+            isGrounded: false,
+            status: 'run', 
+
+            reset() {
+                this.h = this.baseH;
+                this.w = 44;
+                this.y = FLOOR_Y - this.h;
+                this.vy = 0;
+                this.status = 'run';
+                this.isGrounded = true;
+            },
+
+            update() {
+                this.vy += this.gravity;
+                this.y += this.vy;
+
+                // Floor check
+                if (this.y + this.h >= FLOOR_Y) {
+                    this.y = FLOOR_Y - this.h;
+                    this.vy = 0;
+                    if (!this.isGrounded) {
+                        this.isGrounded = true;
+                        if (isHolding) this.slide(); 
+                        else this.run();
+                        spawnParticles(this.x + this.w/2, FLOOR_Y, '#34d399', 5);
+                    }
+                } else {
+                    this.isGrounded = false;
+                }
+
+                // Smooth resizing for squishy animation
+                let targetH = this.status === 'slide' ? this.slideH : (this.status === 'jump' ? this.baseH * 1.1 : this.baseH);
+                let targetW = this.status === 'slide' ? 55 : (this.status === 'jump' ? 35 : 44);
+
+                this.w += (targetW - this.w) * 0.4;
+                this.h += (targetH - this.h) * 0.4;
+
+                // Lock to floor if sliding
+                if (this.isGrounded) {
+                    this.y = FLOOR_Y - this.h;
+                }
+            },
+
+            jump() {
+                if (this.isGrounded) {
+                    this.vy = this.jumpPower;
+                    this.isGrounded = false;
+                    this.status = 'jump';
+                    spawnParticles(this.x + this.w/2, FLOOR_Y, '#ffffff', 4);
+                }
+            },
+
+            slide() {
+                this.status = 'slide';
+                this.h = this.slideH; // Instantly shrink hitbox to ensure dodge
+                if (this.isGrounded) {
+                    this.y = FLOOR_Y - this.h;
+                } else {
+                    this.vy += 6; // Fast-fall if sliding in mid-air
+                }
+            },
+
+            run() {
+                if (this.isGrounded) {
+                    this.status = 'run';
+                    this.h = this.baseH;
+                    this.y = FLOOR_Y - this.h;
+                }
+            },
+
+            draw(ctx) {
+                let bounceY = (this.status === 'run') ? Math.sin(frame * 0.3) * 3 : 0;
+
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.w/2, FLOOR_Y, this.w/2 - 2, 4, 0, 0, Math.PI*2);
+                ctx.fill();
+
+                // Slime Body
+                ctx.fillStyle = '#10b981'; // Emerald
+                ctx.beginPath();
+                ctx.roundRect(this.x, this.y + bounceY, this.w, this.h, 12);
+                ctx.fill();
+
+                // Slime Highlight
+                ctx.fillStyle = '#6ee7b7';
+                ctx.beginPath();
+                ctx.roundRect(this.x + 5, this.y + bounceY + 5, this.w - 15, 8, 4);
+                ctx.fill();
+
+                // Eyes
+                ctx.fillStyle = '#022c22';
+                let eyeY = this.y + bounceY + (this.h * 0.4);
+                
+                if(this.status === 'slide') {
+                    // Closed eyes when sliding
+                    ctx.fillRect(this.x + this.w * 0.55, eyeY, 6, 2);
+                    ctx.fillRect(this.x + this.w * 0.80, eyeY, 6, 2);
+                } else {
+                    // Open eyes
+                    ctx.beginPath(); ctx.ellipse(this.x + this.w * 0.6, eyeY, 3, 5, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(this.x + this.w * 0.8, eyeY, 3, 5, 0, 0, Math.PI*2); ctx.fill();
+                    // Glint
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath(); ctx.arc(this.x + this.w * 0.6 + 1, eyeY - 2, 1.5, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(this.x + this.w * 0.8 + 1, eyeY - 2, 1.5, 0, Math.PI*2); ctx.fill();
+                }
+            }
+        };
+
+        class Entity {
+            constructor(x, y, w, h) {
+                this.x = x; this.y = y; this.w = w; this.h = h; this.dead = false;
+            }
+            update() {
+                this.x -= speed;
+                if (this.x + this.w < 0) this.dead = true;
+            }
+        }
+
+        class Spike extends Entity {
+            constructor() {
+                super(WIDTH, FLOOR_Y - 35, 34, 35);
+            }
+            draw(ctx) {
+                ctx.fillStyle = '#ef4444'; // Red
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + this.h);
+                ctx.lineTo(this.x + this.w/2, this.y);
+                ctx.lineTo(this.x + this.w, this.y + this.h);
+                ctx.fill();
+                
+                ctx.fillStyle = '#fca5a5'; // Highlight
+                ctx.beginPath();
+                ctx.moveTo(this.x + 8, this.y + this.h);
+                ctx.lineTo(this.x + this.w/2, this.y + 12);
+                ctx.lineTo(this.x + this.w - 8, this.y + this.h);
+                ctx.fill();
+            }
+        }
+
+        // --- THE CRUCIAL BAT LOGIC ---
+        class Bat extends Entity {
+            constructor() {
+                // To force a slide:
+                // Normal Player Top = FLOOR_Y - 44 = 296
+                // Sliding Player Top = FLOOR_Y - 20 = 320
+                // Bat Bottom needs to be precisely between these values, e.g., 305.
+                // To prevent jumping over, make the bat hitbox start very high.
+                let batBottomY = 308; // Hits player at 296, misses player at 320.
+                let batHeight = 150;  // Tall enough to block jumps!
+                let batY = batBottomY - batHeight; // 158
+                super(WIDTH, batY, 40, batHeight);
+            }
+            
+            draw(ctx) {
+                // 1. Draw "Stalactite" or Web coming from the ceiling down to the bat
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.w/2, this.y);
+                ctx.lineTo(this.x + this.w/2, this.y + this.h - 20);
+                ctx.stroke();
+
+                // 2. Draw the actual Bat at the BOTTOM of this huge hitbox
+                let actualBatY = this.y + this.h - 30; // Position visually at the bottom
+                
+                ctx.fillStyle = '#8b5cf6'; // Purple Bat
+                let flap = Math.sin(frame * 0.25) * 12;
+                
+                // Body
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.w/2, actualBatY + 15, 12, 10, 0, 0, Math.PI*2);
+                ctx.fill();
+                
+                // Wings
+                ctx.fillStyle = '#6d28d9';
+                // Left Wing
+                ctx.beginPath();
+                ctx.moveTo(this.x + 12, actualBatY + 15);
+                ctx.lineTo(this.x - 15, actualBatY + 15 - flap);
+                ctx.lineTo(this.x, actualBatY + 30);
+                ctx.fill();
+                // Right Wing
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.w - 12, actualBatY + 15);
+                ctx.lineTo(this.x + this.w + 15, actualBatY + 15 - flap);
+                ctx.lineTo(this.x + this.w, actualBatY + 30);
+                ctx.fill();
+
+                // Angry Eyes
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(this.x + 15, actualBatY + 12, 3, 3);
+                ctx.fillRect(this.x + 22, actualBatY + 12, 3, 3);
+            }
+        }
+
+        class Coin extends Entity {
+            constructor(x, y) {
+                super(x, y, 24, 24);
+                this.bobOffset = Math.random() * Math.PI * 2;
+            }
+            draw(ctx) {
+                let bob = Math.sin(frame * 0.1 + this.bobOffset) * 6;
+                let cx = this.x + this.w/2;
+                let cy = this.y + this.h/2 + bob;
+                
+                ctx.fillStyle = '#eab308'; // Gold
+                ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#fef08a'; // Inner
+                ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI*2); ctx.fill();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, size) {
+                this.x = x; this.y = y; this.color = color;
+                this.size = Math.random() * size + 2;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6 - 2;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.04 + 0.03;
+            }
+            update() {
+                this.x += this.vx - (speed * 0.3); 
+                this.y += this.vy;
+                this.life -= this.decay;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function spawnParticles(x, y, color, amount) {
+            for (let i = 0; i < amount; i++) particles.push(new Particle(x, y, color, 6));
+        }
+
+        function spawnEntities() {
+            let spawnRate = Math.max(45, 110 - (speed * 3));
+            
+            if (frame % Math.floor(spawnRate) === 0) {
+                if (Math.random() < 0.55) {
+                    // Spawn Obstacle
+                    if (Math.random() < 0.5) obstacles.push(new Spike());
+                    else obstacles.push(new Bat());
+                } else {
+                    // Spawn Coins
+                    let p = Math.random();
+                    let startX = WIDTH + 50;
+                    if (p < 0.3) {
+                        for(let i=0; i<3; i++) collectibles.push(new Coin(startX + i*35, FLOOR_Y - 40));
+                    } else if (p < 0.6) { // Jump arc
+                        collectibles.push(new Coin(startX, FLOOR_Y - 30));
+                        collectibles.push(new Coin(startX + 40, FLOOR_Y - 100));
+                        collectibles.push(new Coin(startX + 80, FLOOR_Y - 30));
+                    } else { // Low slide coin
+                        collectibles.push(new Coin(startX, FLOOR_Y - 25));
+                    }
+                }
+            }
+        }
+
+        function checkCollisions() {
+            // Player Hitbox: Add small padding so visually it looks fair, 
+            // but keep Y-axis strict for the Bat dodge mechanic.
+            const pBox = {
+                x: player.x + 6,
+                y: player.y + 4,
+                w: player.w - 12,
+                h: player.h - 8
+            };
+
+            const isOverlap = (r1, r2) => {
+                return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x &&
+                       r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
+            };
+
+            for (let obs of obstacles) {
+                // Slight padding for obstacles
+                const oBox = { x: obs.x + 8, y: obs.y + 4, w: obs.w - 16, h: obs.h - 8 };
+                
+                if (!obs.dead && isOverlap(pBox, oBox)) {
+                    triggerGameOver();
+                    return;
+                }
+            }
+
+            for (let coin of collectibles) {
+                if (!coin.dead && isOverlap(pBox, coin)) {
+                    coin.dead = true;
+                    coins++;
+                    coinText.innerHTML = `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path fill="#b45309" d="M12 6v12m-3-3h6m-6-6h6"></path></svg> ${coins}`;
+                    spawnParticles(coin.x + coin.w/2, coin.y + coin.h/2, '#fef08a', 8);
+                }
+            }
+        }
+
+        function drawBackground() {
+            // Floor
+            ctx.fillStyle = '#0f172a'; // Very dark blue
+            ctx.fillRect(0, FLOOR_Y, WIDTH, HEIGHT - FLOOR_Y);
+            
+            // Ground moving lines
+            ctx.fillStyle = '#1e293b'; 
+            let offset = (frame * speed) % 80;
+            for(let i = -1; i < WIDTH / 80 + 1; i++) {
+                ctx.fillRect(i * 80 - offset, FLOOR_Y, 40, 6);
+                ctx.fillRect(i * 80 - offset + 20, FLOOR_Y + 12, 25, 4);
+            }
+
+            // Distant Cave Pillars (Parallax)
+            ctx.fillStyle = '#1e293b';
+            let bgOffset = (frame * speed * 0.2) % 300;
+            for(let i = -1; i < WIDTH / 300 + 2; i++) {
+                ctx.fillRect(i * 300 - bgOffset + 80, 0, 70, FLOOR_Y);
+                ctx.fillStyle = '#0f172a'; // Shadow
+                ctx.fillRect(i * 300 - bgOffset + 130, 0, 20, FLOOR_Y);
+                ctx.fillStyle = '#1e293b';
+            }
+        }
+
+        function gameLoop() {
+            if (state !== 'PLAYING') return;
+            
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            drawBackground();
+
+            distance += speed * 0.015;
+            scoreText.innerText = Math.floor(distance) + ' m';
+            if (speed < MAX_SPEED) speed += SPEED_INC;
+
+            spawnEntities();
+
+            player.update();
+            player.draw(ctx);
+
+            obstacles.forEach(obs => { obs.update(); obs.draw(ctx); });
+            obstacles = obstacles.filter(obs => !obs.dead);
+
+            collectibles.forEach(c => { c.update(); c.draw(ctx); });
+            collectibles = collectibles.filter(c => !c.dead);
+
+            particles.forEach(p => { p.update(); p.draw(ctx); });
+            particles = particles.filter(p => p.life > 0);
+
+            checkCollisions();
+
+            frame++;
+            animationReq = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            state = 'PLAYING';
+            distance = 0; coins = 0; speed = 7.5; frame = 0;
+            obstacles = []; collectibles = []; particles = [];
+            isHolding = false;
+            
+            player.reset();
+            scoreText.innerText = '0 m';
+            coinText.innerHTML = `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path fill="#b45309" d="M12 6v12m-3-3h6m-6-6h6"></path></svg> 0`;
+            
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+            
+            gameLoop();
+        }
+
+        function triggerGameOver() {
+            state = 'GAMEOVER';
+            cancelAnimationFrame(animationReq);
+            spawnParticles(player.x + player.w/2, player.y + player.h/2, '#10b981', 30);
+            
+            hud.classList.add('hidden');
+            gameOverScreen.classList.remove('hidden');
+            document.getElementById('finalScore').innerText = Math.floor(distance) + 'm';
+            document.getElementById('finalCoins').innerText = coins;
+        }
+
+        function handleInputDown(e) {
+            if(e.target === canvas) e.preventDefault();
+            if (state !== 'PLAYING') return;
+            
+            isHolding = true;
+            touchStartTime = Date.now();
+            
+            // Set timer: If held long enough, trigger slide
+            inputTimer = setTimeout(() => {
+                if (isHolding) player.slide();
+            }, HOLD_THRESHOLD);
+        }
+
+        function handleInputUp(e) {
+            if(e.target === canvas) e.preventDefault();
+            if (state !== 'PLAYING' || !isHolding) return;
+            
+            isHolding = false;
+            clearTimeout(inputTimer); 
+            
+            let pressDuration = Date.now() - touchStartTime;
+            
+            if (pressDuration < HOLD_THRESHOLD) {
+                // Short tap = Jump
+                player.jump();
+            } else {
+                // Long hold release = Stop sliding
+                player.run();
+            }
+        }
+
+        canvas.addEventListener('mousedown', handleInputDown);
+        canvas.addEventListener('touchstart', handleInputDown, {passive: false});
+        
+        window.addEventListener('mouseup', handleInputUp);
+        window.addEventListener('touchend', handleInputUp, {passive: false});
+
+        // Keyboard Setup
+        window.addEventListener('keydown', (e) => {
+            if (state !== 'PLAYING') return;
+            if ((e.code === 'Space' || e.code === 'ArrowUp') && !isHolding) {
+                isHolding = true;
+                player.jump(); 
+            }
+            if (e.code === 'ArrowDown' && !isHolding) {
+                isHolding = true;
+                player.slide();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (state !== 'PLAYING') return;
+            if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown') {
+                isHolding = false;
+                player.run();
+            }
+        });
+
+        // Init
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+        drawBackground();
+        player.reset();
+        player.draw(ctx);
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Meteor Strike</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050510;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* Prevent scroll on touch devices */
+        }
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        
+        /* Combo pop animation */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); color: #fbbf24; }
+            100% { transform: scale(1); }
+        }
+        .combo-animate {
+            animation: pop 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-none hidden">
+        <div class="flex flex-col">
+            <span class="text-3xl font-bold text-white drop-shadow-md" id="scoreDisplay">0</span>
+            <span class="text-lg font-bold text-gray-400 mt-1 transition-all" id="comboDisplay">Combo x1</span>
+        </div>
+        <div class="flex gap-2" id="powerupIcons">
+            <!-- Powerup indicators will go here -->
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="startScreen" class="ui-layer bg-black/60 backdrop-blur-sm z-50">
+        <div class="bg-gray-900/80 p-8 rounded-2xl border border-gray-700 text-center max-w-md w-11/12 shadow-2xl interactive">
+            <h1 class="text-5xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-purple-600">METEOR STRIKE</h1>
+            <p class="text-gray-300 mb-6">Drag to move. Auto-fire.<br>Survive the endless storm!</p>
+            
+            <div class="grid grid-cols-3 gap-2 mb-6 text-sm text-gray-400">
+                <div class="flex flex-col items-center">
+                    <div class="w-4 h-4 bg-green-500 rounded-full mb-1"></div> Spread
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-4 h-4 bg-cyan-500 rounded-full mb-1"></div> Shield
+                </div>
+                <div class="flex flex-col items-center">
+                    <div class="w-4 h-4 bg-red-500 rounded-full mb-1"></div> Nuke
+                </div>
+            </div>
+
+            <button id="startBtn" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xl transition-transform transform active:scale-95">
+                START MISSION
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="ui-layer bg-red-900/40 backdrop-blur-md z-50 hidden">
+        <div class="bg-gray-900/90 p-8 rounded-2xl border border-red-500 text-center max-w-md w-11/12 shadow-2xl interactive">
+            <h2 class="text-4xl font-black text-white mb-2">HULL DESTROYED</h2>
+            <div class="my-6">
+                <p class="text-gray-400 text-sm uppercase tracking-widest mb-1">Final Score</p>
+                <p class="text-6xl font-black text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" id="finalScore">0</p>
+            </div>
+            <button id="restartBtn" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-xl transition-transform transform active:scale-95">
+                PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- Flash Effect for Nuke -->
+    <div id="flashEffect" class="absolute inset-0 bg-white opacity-0 pointer-events-none transition-opacity duration-300 z-40 hidden"></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let GAME_WIDTH = window.innerWidth;
+        let GAME_HEIGHT = window.innerHeight;
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+
+        window.addEventListener('resize', () => {
+            GAME_WIDTH = window.innerWidth;
+            GAME_HEIGHT = window.innerHeight;
+            canvas.width = GAME_WIDTH;
+            canvas.height = GAME_HEIGHT;
+        });
+
+        // UI Elements
+        const uiStart = document.getElementById('startScreen');
+        const uiGameOver = document.getElementById('gameOverScreen');
+        const uiHUD = document.getElementById('hud');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const comboDisplay = document.getElementById('comboDisplay');
+        const finalScore = document.getElementById('finalScore');
+        const flashEffect = document.getElementById('flashEffect');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // Game State
+        let gameState = 'START'; // START, PLAYING, GAMEOVER
+        let score = 0;
+        let lastTime = 0;
+        let gameTime = 0;
+        let animationId;
+
+        // Difficulty & Spawning
+        let meteorSpawnTimer = 0;
+        let meteorSpawnInterval = 1200; 
+        const MIN_SPAWN_INTERVAL = 300;
+        let difficultyMultiplier = 1;
+
+        // Combo System
+        let comboCount = 0;
+        let comboMultiplier = 1;
+        let comboTimer = 0;
+        const COMBO_MAX_TIME = 2000; // ms to keep combo alive without kills
+
+        // Entities
+        let player;
+        let bullets = [];
+        let meteors = [];
+        let particles = [];
+        let powerups = [];
+        let stars = [];
+
+        // Audio Synths (Tone.js)
+        let shootSynth, hitSynth, expSynth, powerupSynth, nukeSynth;
+        let audioInitialized = false;
+
+        function initAudio() {
+            if (audioInitialized) return;
+            Tone.start();
+            
+            shootSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "square" },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
+            }).toDestination();
+            shootSynth.volume.value = -15;
+
+            hitSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.05,
+                octaves: 2,
+                oscillator: { type: "square" },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 }
+            }).toDestination();
+            hitSynth.volume.value = -10;
+
+            expSynth = new Tone.NoiseSynth({
+                noise: { type: "brown" },
+                envelope: { attack: 0.01, decay: 0.5, sustain: 0 }
+            }).toDestination();
+            expSynth.volume.value = -10;
+
+            powerupSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.1, decay: 0.2, sustain: 0.2, release: 0.5 }
+            }).toDestination();
+            powerupSynth.volume.value = -5;
+
+            nukeSynth = new Tone.NoiseSynth({
+                noise: { type: "white" },
+                envelope: { attack: 0.1, decay: 1.5, sustain: 0 }
+            }).toDestination();
+            nukeSynth.volume.value = -2;
+
+            audioInitialized = true;
+        }
+
+        function playSound(type) {
+            if (!audioInitialized) return;
+            try {
+                if (type === 'shoot') shootSynth.triggerAttackRelease(["C5", "E5"], "16n");
+                if (type === 'hit') hitSynth.triggerAttackRelease("C2", "8n");
+                if (type === 'explode') expSynth.triggerAttackRelease("8n");
+                if (type === 'powerup') powerupSynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n");
+                if (type === 'nuke') nukeSynth.triggerAttackRelease("2n");
+            } catch(e) { console.warn("Audio error", e); }
+        }
+
+        class Player {
+            constructor() {
+                this.width = 40;
+                this.height = 50;
+                this.x = GAME_WIDTH / 2;
+                this.y = GAME_HEIGHT - 80;
+                this.targetX = this.x;
+                this.targetY = this.y;
+                
+                // Weapon
+                this.fireTimer = 0;
+                this.fireRate = 180;
+                this.spreadActive = false;
+                this.spreadTimer = 0;
+                
+                // Defense
+                this.shieldActive = false;
+                
+                // Visuals
+                this.enginePulse = 0;
+            }
+
+            update(dt) {
+                // Smooth movement towards target (drag)
+                this.x += (this.targetX - this.x) * 0.3;
+                this.y += (this.targetY - this.y) * 0.3;
+
+                // Clamp to screen
+                this.x = Math.max(this.width/2, Math.min(GAME_WIDTH - this.width/2, this.x));
+                this.y = Math.max(this.height/2, Math.min(GAME_HEIGHT - this.height/2, this.y));
+
+                // Auto fire
+                this.fireTimer += dt;
+                if (this.fireTimer >= (this.spreadActive ? this.fireRate * 0.8 : this.fireRate)) {
+                    this.fireTimer = 0;
+                    this.shoot();
+                }
+
+                // Powerup timers
+                if (this.spreadActive) {
+                    this.spreadTimer -= dt;
+                    if (this.spreadTimer <= 0) this.spreadActive = false;
+                }
+
+                this.enginePulse += dt * 0.01;
+            }
+
+            shoot() {
+                if (this.spreadActive) {
+                    bullets.push(new Bullet(this.x, this.y - 20, 0, -12, '#10b981')); // Center
+                    bullets.push(new Bullet(this.x - 15, this.y - 15, -3, -11, '#10b981')); // Left
+                    bullets.push(new Bullet(this.x + 15, this.y - 15, 3, -11, '#10b981')); // Right
+                } else {
+                    bullets.push(new Bullet(this.x, this.y - 20, 0, -15, '#3b82f6'));
+                }
+                playSound('shoot');
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Shield
+                if (this.shieldActive) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 45, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(6, 182, 212, ${0.5 + Math.sin(this.enginePulse*2)*0.2})`;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    ctx.fillStyle = "rgba(6, 182, 212, 0.1)";
+                    ctx.fill();
+                }
+
+                // Engine flame
+                ctx.beginPath();
+                ctx.moveTo(-10, 15);
+                ctx.lineTo(10, 15);
+                ctx.lineTo(0, 30 + Math.random() * 15);
+                ctx.fillStyle = '#f97316';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(-5, 15);
+                ctx.lineTo(5, 15);
+                ctx.lineTo(0, 25 + Math.random() * 10);
+                ctx.fillStyle = '#fef08a';
+                ctx.fill();
+
+                // Ship body (Sleek futuristic jet)
+                ctx.beginPath();
+                ctx.moveTo(0, -this.height/2); // Nose
+                ctx.lineTo(this.width/2, this.height/2 - 10); // Right wing tip
+                ctx.lineTo(this.width/2 - 10, this.height/2); // Right wing bottom
+                ctx.lineTo(-this.width/2 + 10, this.height/2); // Left wing bottom
+                ctx.lineTo(-this.width/2, this.height/2 - 10); // Left wing tip
+                ctx.closePath();
+                ctx.fillStyle = '#e2e8f0';
+                ctx.fill();
+
+                // Cockpit
+                ctx.beginPath();
+                ctx.moveTo(0, -this.height/2 + 15);
+                ctx.lineTo(8, 5);
+                ctx.lineTo(-8, 5);
+                ctx.closePath();
+                ctx.fillStyle = '#38bdf8';
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, vx, vy, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.radius = 4;
+                this.markedForDeletion = false;
+            }
+            update(dt) {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y < -50 || this.x < -50 || this.x > GAME_WIDTH + 50) this.markedForDeletion = true;
+            }
+            draw(ctx) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                
+                // Glow
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius+1, 0, Math.PI*2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        class Meteor {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'SMALL', 'LARGE', 'SPLIT'
+                this.markedForDeletion = false;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.05;
+                
+                // Generate jagged shape
+                this.vertices = [];
+                const points = 8 + Math.floor(Math.random()*4);
+                
+                switch(type) {
+                    case 'SMALL':
+                        this.radius = 15 + Math.random() * 10;
+                        this.hp = 1;
+                        this.scoreVal = 10;
+                        this.vy = (3 + Math.random() * 3) * difficultyMultiplier;
+                        this.vx = (Math.random() - 0.5) * 2;
+                        this.color = '#78716c';
+                        break;
+                    case 'LARGE':
+                        this.radius = 40 + Math.random() * 20;
+                        this.hp = 5;
+                        this.scoreVal = 50;
+                        this.vy = (1.5 + Math.random() * 1.5) * difficultyMultiplier;
+                        this.vx = (Math.random() - 0.5);
+                        this.color = '#44403c';
+                        break;
+                    case 'SPLIT':
+                        this.radius = 35 + Math.random() * 10;
+                        this.hp = 2;
+                        this.scoreVal = 30;
+                        this.vy = (2 + Math.random() * 2) * difficultyMultiplier;
+                        this.vx = (Math.random() - 0.5) * 1.5;
+                        this.color = '#5b21b6';
+                        break;
+                }
+
+                for(let i=0; i<points; i++) {
+                    const angle = (i / points) * Math.PI * 2;
+                    const r = this.radius * (0.8 + Math.random() * 0.4);
+                    this.vertices.push({x: Math.cos(angle)*r, y: Math.sin(angle)*r});
+                }
+            }
+            
+            update(dt) {
+                this.y += this.vy;
+                this.x += this.vx;
+                this.rotation += this.rotSpeed;
+                
+                if (this.y > GAME_HEIGHT + this.radius) {
+                    this.markedForDeletion = true;
+                    resetCombo(); // Letting enemies pass breaks combo maybe? Let's say no, only hit breaks combo in classic games, but time breaks it too.
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                ctx.beginPath();
+                ctx.moveTo(this.vertices[0].x, this.vertices[0].y);
+                for(let i=1; i<this.vertices.length; i++) {
+                    ctx.lineTo(this.vertices[i].x, this.vertices[i].y);
+                }
+                ctx.closePath();
+                
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Simple highlight
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // HP Indicator for large
+                if (this.type === 'LARGE' && this.hp < 5) {
+                    ctx.rotate(-this.rotation);
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(-15, -this.radius - 10, 30 * (this.hp/5), 4);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        class PowerUp {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'SPREAD', 'SHIELD', 'NUKE'
+                this.radius = 18;
+                this.vy = 2;
+                this.markedForDeletion = false;
+                this.pulse = 0;
+            }
+            update(dt) {
+                this.y += this.vy;
+                this.pulse += dt * 0.01;
+                if (this.y > GAME_HEIGHT + this.radius) this.markedForDeletion = true;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                let color, label;
+                if (this.type === 'SPREAD') { color = '#10b981'; label = 'S'; }
+                else if (this.type === 'SHIELD') { color = '#06b6d4'; label = 'O'; }
+                else { color = '#ef4444'; label = 'N'; }
+
+                const scale = 1 + Math.sin(this.pulse) * 0.1;
+                ctx.scale(scale, scale);
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI*2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = color;
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 18px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 0;
+                ctx.fillText(label, 0, 1);
+                
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, speed, size) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * speed;
+                this.vy = (Math.random() - 0.5) * speed;
+                this.color = color;
+                this.radius = Math.random() * size + 1;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.02 + 0.02;
+                this.markedForDeletion = false;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+                if (this.life <= 0) this.markedForDeletion = true;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.life;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        class Star {
+            constructor() {
+                this.x = Math.random() * GAME_WIDTH;
+                this.y = Math.random() * GAME_HEIGHT;
+                this.size = Math.random() * 2;
+                this.speed = (Math.random() * 0.5 + 0.1) * (this.size > 1 ? 2 : 1);
+                this.alpha = Math.random();
+            }
+            update() {
+                this.y += this.speed * difficultyMultiplier * 0.5;
+                if (this.y > GAME_HEIGHT) {
+                    this.y = 0;
+                    this.x = Math.random() * GAME_WIDTH;
+                }
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function createExplosion(x, y, color, count, speed, size) {
+            for(let i=0; i<count; i++) {
+                particles.push(new Particle(x, y, color, speed, size));
+            }
+            playSound('explode');
+        }
+
+        function spawnMeteor() {
+            const x = Math.random() * (GAME_WIDTH - 60) + 30;
+            const y = -50;
+            const rand = Math.random();
+            let type = 'SMALL';
+            
+            if (gameTime > 15000 && rand > 0.8) type = 'LARGE';
+            else if (gameTime > 30000 && rand > 0.6) type = 'SPLIT';
+            
+            meteors.push(new Meteor(x, y, type));
+        }
+
+        function trySpawnPowerUp(x, y) {
+            if (Math.random() < 0.08) { // 8% chance on kill
+                const rand = Math.random();
+                let type = 'SPREAD';
+                if (rand > 0.8) type = 'NUKE';
+                else if (rand > 0.5) type = 'SHIELD';
+                powerups.push(new PowerUp(x, y, type));
+            }
+        }
+
+        function triggerNuke() {
+            playSound('nuke');
+            flashEffect.classList.remove('hidden');
+            flashEffect.style.opacity = '1';
+            
+            meteors.forEach(m => {
+                createExplosion(m.x, m.y, m.color, 20, 10, 4);
+                addScore(m.scoreVal);
+            });
+            meteors = [];
+
+            setTimeout(() => {
+                flashEffect.style.opacity = '0';
+                setTimeout(() => flashEffect.classList.add('hidden'), 300);
+            }, 100);
+        }
+
+        function addScore(points) {
+            score += points * comboMultiplier;
+            scoreDisplay.innerText = score;
+            
+            // Manage Combo
+            comboCount++;
+            comboTimer = COMBO_MAX_TIME;
+            updateComboMultiplier();
+        }
+
+        function updateComboMultiplier() {
+            let newMult = 1;
+            if (comboCount > 50) newMult = 5;
+            else if (comboCount > 30) newMult = 4;
+            else if (comboCount > 15) newMult = 3;
+            else if (comboCount > 5) newMult = 2;
+
+            if (newMult !== comboMultiplier) {
+                comboMultiplier = newMult;
+                comboDisplay.innerText = `Combo x${comboMultiplier}`;
+                
+                // Visual pop
+                comboDisplay.classList.remove('combo-animate');
+                void comboDisplay.offsetWidth; // trigger reflow
+                comboDisplay.classList.add('combo-animate');
+                
+                if (comboMultiplier > 1) {
+                    comboDisplay.classList.replace('text-gray-400', 'text-yellow-400');
+                }
+            }
+        }
+
+        function resetCombo() {
+            comboCount = 0;
+            comboMultiplier = 1;
+            comboDisplay.innerText = `Combo x1`;
+            comboDisplay.classList.replace('text-yellow-400', 'text-gray-400');
+        }
+
+        function checkCollisions() {
+            // Bullets vs Meteors
+            for(let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                for(let j = meteors.length - 1; j >= 0; j--) {
+                    let m = meteors[j];
+                    
+                    const dx = b.x - m.x;
+                    const dy = b.y - m.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < m.radius + b.radius) {
+                        b.markedForDeletion = true;
+                        playSound('hit');
+                        m.hp--;
+                        createExplosion(b.x, b.y, '#fef08a', 5, 3, 2);
+
+                        if (m.hp <= 0) {
+                            m.markedForDeletion = true;
+                            addScore(m.scoreVal);
+                            createExplosion(m.x, m.y, m.color, 15, 6, 4);
+                            trySpawnPowerUp(m.x, m.y);
+
+                            if (m.type === 'SPLIT') {
+                                let sub1 = new Meteor(m.x - 15, m.y, 'SMALL');
+                                let sub2 = new Meteor(m.x + 15, m.y, 'SMALL');
+                                sub1.vx = -2; sub2.vx = 2;
+                                meteors.push(sub1, sub2);
+                            }
+                        }
+                        break; 
+                    }
+                }
+            }
+
+            // Player vs Powerups
+            for(let i = powerups.length - 1; i >= 0; i--) {
+                let p = powerups[i];
+                const dx = player.x - p.x;
+                const dy = player.y - p.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < p.radius + player.width/2) {
+                    p.markedForDeletion = true;
+                    playSound('powerup');
+                    
+                    if (p.type === 'SPREAD') {
+                        player.spreadActive = true;
+                        player.spreadTimer = 8000; // 8 seconds
+                    } else if (p.type === 'SHIELD') {
+                        player.shieldActive = true;
+                    } else if (p.type === 'NUKE') {
+                        triggerNuke();
+                    }
+                }
+            }
+
+            // Player vs Meteors
+            for(let i = 0; i < meteors.length; i++) {
+                let m = meteors[i];
+                const dx = player.x - m.x;
+                const dy = player.y - m.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                // Make hitbox slightly smaller than visual size for fairness
+                if (dist < m.radius + player.width/3) {
+                    if (player.shieldActive) {
+                        player.shieldActive = false;
+                        m.markedForDeletion = true;
+                        createExplosion(m.x, m.y, '#06b6d4', 20, 8, 3);
+                        playSound('explode');
+                    } else {
+                        gameOver();
+                    }
+                }
+            }
+        }
+
+        function initGame() {
+            player = new Player();
+            bullets = [];
+            meteors = [];
+            particles = [];
+            powerups = [];
+            stars = [];
+            for(let i=0; i<100; i++) stars.push(new Star());
+            
+            score = 0;
+            scoreDisplay.innerText = score;
+            gameTime = 0;
+            meteorSpawnInterval = 1200;
+            difficultyMultiplier = 1;
+            resetCombo();
+            
+            uiStart.classList.add('hidden');
+            uiGameOver.classList.add('hidden');
+            uiHUD.classList.remove('hidden');
+            
+            gameState = 'PLAYING';
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            uiHUD.classList.add('hidden');
+            uiGameOver.classList.remove('hidden');
+            finalScore.innerText = score;
+            createExplosion(player.x, player.y, '#f97316', 50, 15, 5);
+            playSound('explode');
+        }
+
+        function gameLoop(timestamp) {
+            if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER') return;
+            
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // Update Phase
+            if (gameState === 'PLAYING') {
+                gameTime += dt;
+                
+                // Difficulty increase
+                difficultyMultiplier = 1 + (gameTime / 60000); // Increases by 1x every minute
+                meteorSpawnInterval = Math.max(MIN_SPAWN_INTERVAL, 1200 - (gameTime / 100));
+
+                // Spawning
+                meteorSpawnTimer += dt;
+                if (meteorSpawnTimer >= meteorSpawnInterval) {
+                    spawnMeteor();
+                    meteorSpawnTimer = 0;
+                }
+
+                // Combo Decay
+                if (comboCount > 0) {
+                    comboTimer -= dt;
+                    if (comboTimer <= 0) resetCombo();
+                }
+
+                player.update(dt);
+                checkCollisions();
+            }
+
+            stars.forEach(s => s.update());
+            bullets.forEach(b => b.update(dt));
+            meteors.forEach(m => m.update(dt));
+            powerups.forEach(p => p.update(dt));
+            particles.forEach(p => p.update());
+
+            // Cleanup
+            bullets = bullets.filter(b => !b.markedForDeletion);
+            meteors = meteors.filter(m => !m.markedForDeletion);
+            powerups = powerups.filter(p => !p.markedForDeletion);
+            particles = particles.filter(p => !p.markedForDeletion);
+
+            // Draw Phase
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            stars.forEach(s => s.draw(ctx));
+            powerups.forEach(p => p.draw(ctx));
+            meteors.forEach(m => m.draw(ctx));
+            bullets.forEach(b => b.draw(ctx));
+            particles.forEach(p => p.draw(ctx));
+            
+            if (gameState === 'PLAYING') {
+                player.draw(ctx);
+            }
+
+            if (gameState === 'PLAYING' || particles.length > 0) {
+                animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Input Listeners
+        const handlePointer = (e) => {
+            if (gameState !== 'PLAYING') return;
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            // Offset Y slightly so finger doesn't cover the ship on mobile
+            player.targetX = clientX;
+            player.targetY = clientY - 40;
+        };
+
+        window.addEventListener('pointermove', handlePointer);
+        window.addEventListener('touchmove', handlePointer, {passive: false}); // Prevent default scrolling
+
+        startBtn.addEventListener('click', () => {
+            initAudio();
+            initGame();
+        });
+
+        restartBtn.addEventListener('click', () => {
+            initAudio();
+            initGame();
+        });
+
+        // Generate initial stars for background
+        for(let i=0; i<100; i++) stars.push(new Star());
+        
+        // Initial Background Render
+        function renderIdle() {
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            stars.forEach(s => {
+                s.update();
+                s.draw(ctx);
+            });
+            if(gameState === 'START') requestAnimationFrame(renderIdle);
+        }
+        renderIdle();
+
+    </script>
+</body>
+</html>
