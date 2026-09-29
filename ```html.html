@@ -1,0 +1,2816 @@
+```html
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mushroom Boy</title>
+
+<style>
+*{
+  box-sizing:border-box
+}
+
+body{
+  margin:0;
+  background:#17212b;
+  color:#fff;
+  font-family:Arial,sans-serif;
+  text-align:center
+}
+
+#wrap{
+  width:min(920px,100%);
+  margin:12px auto;
+  padding:0 8px
+}
+
+h1{
+  margin:8px 0
+}
+
+.panel{
+  background:#263542;
+  border:2px solid #425565;
+  border-radius:12px;
+  padding:20px
+}
+
+.hidden{
+  display:none!important
+}
+
+.menuBtn,
+.levelBtn,
+#resetBtn{
+  border:0;
+  border-radius:9px;
+  padding:11px 18px;
+  margin:5px;
+  background:#4caf50;
+  color:#fff;
+  font-weight:bold;
+  cursor:pointer
+}
+
+.menuBtn.selected{
+  background:#ff9800
+}
+
+.levelBtn:disabled{
+  background:#555;
+  cursor:not-allowed
+}
+
+.levelBtn.active{
+  background:#ff9800
+}
+
+#hud{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:8px 0
+}
+
+.stat{
+  background:#263542;
+  padding:7px 11px;
+  border-radius:8px
+}
+
+.difficulty{
+  margin:15px 0
+}
+
+.difficulty button{
+  min-width:110px
+}
+
+#game{
+  display:block;
+  width:100%;
+  height:auto;
+  border:3px solid #fff;
+  border-radius:10px;
+  background:#87ceeb;
+  touch-action:none
+}
+
+#message{
+  min-height:30px;
+  font-weight:bold;
+  margin:8px 0
+}
+
+.controls{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+  margin-top:8px
+}
+
+.controls button{
+  width:58px;
+  height:48px;
+  border:2px solid #fff;
+  border-radius:10px;
+  background:#35495a;
+  color:#fff;
+  font-size:20px;
+  font-weight:bold;
+  touch-action:none
+}
+
+.controls button:active{
+  background:#ff9800
+}
+
+.small{
+  font-size:12px;
+  color:#cbd5dc;
+  margin-top:6px
+}
+
+.overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.75);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10
+}
+
+.overlayBox{
+  background:#263542;
+  border:3px solid #fff;
+  border-radius:16px;
+  padding:30px;
+  min-width:280px
+}
+
+.overlayBox h2{
+  margin-top:0;
+  color:#ffcc66
+}
+</style>
+</head>
+
+<body>
+
+<div id="wrap">
+
+  <!-- =========================
+       หน้าเข้าเกม
+  ========================== -->
+
+  <div id="startScreen" class="panel">
+
+    <h1>🍄 Mushroom Boy</h1>
+
+    <p>
+      เก็บเห็ดให้ครบ แล้วกลับไปที่ 🏁 เพื่อผ่านด่าน
+    </p>
+
+    <div class="difficulty">
+
+      <b>เลือกระดับความยาก</b>
+
+      <br>
+
+      <button
+        id="easyBtn"
+        class="menuBtn selected">
+        😊 ง่าย
+      </button>
+
+      <button
+        id="hardBtn"
+        class="menuBtn">
+        🔥 ยาก
+      </button>
+
+    </div>
+
+    <button
+      id="startBtn"
+      class="menuBtn">
+      ▶ เริ่มเกม
+    </button>
+
+  </div>
+
+
+  <!-- =========================
+       หน้าตัวเกม
+  ========================== -->
+
+  <div id="gameScreen" class="hidden">
+
+    <h1>🍄 Mushroom Boy</h1>
+
+    <div id="hud">
+
+      <div class="stat">
+        ❤️ <span id="lives">3</span>
+      </div>
+
+      <div class="stat">
+        🍄 <span id="mushrooms">0/0</span>
+      </div>
+
+      <div class="stat">
+        🛡️ <span id="shield">0</span>
+      </div>
+
+      <div class="stat">
+        ด่าน <span id="levelText">1</span>
+      </div>
+
+      <div class="stat">
+        โหมด <span id="difficultyText">ง่าย</span>
+      </div>
+
+    </div>
+
+
+    <div id="levelMenu"></div>
+
+
+    <canvas
+      id="game"
+      width="900"
+      height="500">
+    </canvas>
+
+
+    <div id="message">
+      เก็บเห็ดให้ครบแล้วกลับไปที่ 🏁
+    </div>
+
+
+    <!-- ปุ่มควบคุม -->
+
+    <div class="controls">
+
+      <button data-key="a">A</button>
+
+      <button data-key="w">W</button>
+
+      <button data-key="s">S</button>
+
+      <button data-key="d">D</button>
+
+    </div>
+
+
+    <div class="small">
+      W = กระโดด | A = ซ้าย | S = ก้ม | D = ขวา
+    </div>
+
+
+    <button id="resetBtn">
+      รีเซ็ตด่าน
+    </button>
+
+    <button id="menuBtn" class="menuBtn">
+      กลับหน้าแรก
+    </button>
+
+  </div>
+
+</div>
+
+
+<!-- =========================
+     GAME OVER
+========================== -->
+
+<div id="gameOver" class="overlay hidden">
+
+  <div class="overlayBox">
+
+    <h2>💀 GAME OVER</h2>
+
+    <p>ชีวิตหมดแล้ว</p>
+
+    <button
+      id="retryBtn"
+      class="menuBtn">
+      🔄 เล่นใหม่
+    </button>
+
+    <button
+      id="overMenuBtn"
+      class="menuBtn">
+      🏠 หน้าแรก
+    </button>
+
+  </div>
+
+</div>
+
+
+<script>
+
+"use strict";
+
+
+/* =========================
+   ELEMENTS
+========================= */
+
+const canvas =
+  document.getElementById("game");
+
+const ctx =
+  canvas.getContext("2d");
+
+
+const livesEl =
+  document.getElementById("lives");
+
+const mushroomsEl =
+  document.getElementById("mushrooms");
+
+const shieldEl =
+  document.getElementById("shield");
+
+const levelTextEl =
+  document.getElementById("levelText");
+
+const difficultyTextEl =
+  document.getElementById("difficultyText");
+
+const messageEl =
+  document.getElementById("message");
+
+const levelMenu =
+  document.getElementById("levelMenu");
+
+
+const startScreen =
+  document.getElementById("startScreen");
+
+const gameScreen =
+  document.getElementById("gameScreen");
+
+const gameOver =
+  document.getElementById("gameOver");
+
+
+/* =========================
+   LEVEL DATA
+========================= */
+
+const info = {
+
+  1:{
+    name:"ป่าเริ่มต้น",
+    mushrooms:5,
+    enemies:1
+  },
+
+  2:{
+    name:"ป่าลึก",
+    mushrooms:7,
+    enemies:2
+  },
+
+  3:{
+    name:"ภูเขา",
+    mushrooms:8,
+    enemies:3
+  },
+
+  4:{
+    name:"ถ้ำลาวา",
+    mushrooms:10,
+    enemies:4
+  },
+
+  5:{
+    name:"ปราสาท",
+    mushrooms:12,
+    enemies:5
+  }
+
+};
+
+
+/* =========================
+   GAME SETTINGS
+========================= */
+
+const world = {
+
+  w:900,
+
+  h:500,
+
+  ground:450
+
+};
+
+
+const settings = {
+
+  easy:{
+    speed:2.25,
+    jump:-10.5,
+    enemy:1.0,
+    lives:3
+  },
+
+  hard:{
+    speed:1.75,
+    jump:-10.5,
+    enemy:1.65,
+    lives:2
+  }
+
+};
+
+
+let difficulty = "easy";
+
+let level = 1;
+
+let lives = 3;
+
+let shield = 0;
+
+let gameRunning = false;
+
+let animationId = 0;
+
+let invulnerableUntil = 0;
+
+
+let unlockedLevel =
+  Math.max(
+    1,
+    Math.min(
+      5,
+      Number(
+        localStorage.getItem(
+          "mushroomBoyUnlocked"
+        ) || 1
+      )
+    )
+  );
+
+
+/* =========================
+   CONTROL
+========================= */
+
+const keys = {
+
+  w:false,
+
+  a:false,
+
+  s:false,
+
+  d:false
+
+};
+
+
+function resetKeys(){
+
+  keys.w = false;
+
+  keys.a = false;
+
+  keys.s = false;
+
+  keys.d = false;
+
+}
+
+
+function setKey(key,value){
+
+  if(key in keys){
+
+    keys[key] = value;
+
+  }
+
+}
+
+
+function keyMap(e){
+
+  const k =
+    e.key.toLowerCase();
+
+
+  if(
+    k === "w" ||
+    k === "arrowup"
+  )
+    return "w";
+
+
+  if(
+    k === "a" ||
+    k === "arrowleft"
+  )
+    return "a";
+
+
+  if(
+    k === "s" ||
+    k === "arrowdown"
+  )
+    return "s";
+
+
+  if(
+    k === "d" ||
+    k === "arrowright"
+  )
+    return "d";
+
+
+  return null;
+
+}
+
+
+window.addEventListener(
+  "keydown",
+  e => {
+
+    const k =
+      keyMap(e);
+
+    if(k){
+
+      e.preventDefault();
+
+      setKey(k,true);
+
+    }
+
+  }
+);
+
+
+window.addEventListener(
+  "keyup",
+  e => {
+
+    const k =
+      keyMap(e);
+
+    if(k){
+
+      e.preventDefault();
+
+      setKey(k,false);
+
+    }
+
+  }
+);
+
+
+window.addEventListener(
+  "blur",
+  resetKeys
+);
+
+
+/* =========================
+   TOUCH BUTTONS
+========================= */
+
+document
+.querySelectorAll(".controls button")
+.forEach(button => {
+
+  const key =
+    button.dataset.key;
+
+
+  const down = e => {
+
+    e.preventDefault();
+
+    setKey(key,true);
+
+  };
+
+
+  const up = e => {
+
+    e.preventDefault();
+
+    setKey(key,false);
+
+  };
+
+
+  button.addEventListener(
+    "pointerdown",
+    down
+  );
+
+
+  button.addEventListener(
+    "pointerup",
+    up
+  );
+
+
+  button.addEventListener(
+    "pointercancel",
+    up
+  );
+
+
+  button.addEventListener(
+    "pointerleave",
+    up
+  );
+
+});
+
+
+/* =========================
+   MENU
+========================= */
+
+document
+.getElementById("easyBtn")
+.onclick = () => {
+
+  difficulty = "easy";
+
+  document
+    .getElementById("easyBtn")
+    .classList.add("selected");
+
+  document
+    .getElementById("hardBtn")
+    .classList.remove("selected");
+
+};
+
+
+document
+.getElementById("hardBtn")
+.onclick = () => {
+
+  difficulty = "hard";
+
+  document
+    .getElementById("hardBtn")
+    .classList.add("selected");
+
+  document
+    .getElementById("easyBtn")
+    .classList.remove("selected");
+
+};
+
+
+document
+.getElementById("startBtn")
+.onclick = () => {
+
+  startScreen
+    .classList
+    .add("hidden");
+
+  gameScreen
+    .classList
+    .remove("hidden");
+
+  loadLevel(1);
+
+};
+
+
+document
+.getElementById("menuBtn")
+.onclick =
+  showMenu;
+
+
+document
+.getElementById("overMenuBtn")
+.onclick =
+  showMenu;
+
+
+document
+.getElementById("retryBtn")
+.onclick = () => {
+
+  gameOver
+    .classList
+    .add("hidden");
+
+  loadLevel(level);
+
+};
+
+
+document
+.getElementById("resetBtn")
+.onclick = () => {
+
+  localStorage.setItem(
+    "mushroomBoyUnlocked",
+    "1"
+  );
+
+  unlockedLevel = 1;
+
+  createLevelButtons();
+
+  loadLevel(1);
+
+};
+
+
+function showMenu(){
+
+  gameRunning = false;
+
+  cancelAnimationFrame(
+    animationId
+  );
+
+  resetKeys();
+
+  gameOver
+    .classList
+    .add("hidden");
+
+  gameScreen
+    .classList
+    .add("hidden");
+
+  startScreen
+    .classList
+    .remove("hidden");
+
+}
+
+
+/* =========================
+   LEVEL BUTTONS
+========================= */
+
+function createLevelButtons(){
+
+  levelMenu.innerHTML = "";
+
+
+  for(
+    let i=1;
+    i<=5;
+    i++
+  ){
+
+    const button =
+      document.createElement(
+        "button"
+      );
+
+
+    button.className =
+      "levelBtn" +
+      (
+        i === level
+        ? " active"
+        : ""
+      );
+
+
+    button.textContent =
+      `ด่าน ${i}` +
+      (
+        i > unlockedLevel
+        ? " 🔒"
+        : ""
+      );
+
+
+    button.disabled =
+      i > unlockedLevel;
+
+
+    button.onclick =
+      () => loadLevel(i);
+
+
+    levelMenu.appendChild(
+      button
+    );
+
+  }
+
+}
+
+
+/* =========================
+   PLAYER
+========================= */
+
+function makePlayer(){
+
+  return {
+
+    x:35,
+
+    y:395,
+
+    width:34,
+
+    height:55,
+
+    normalHeight:55,
+
+    crouchHeight:31,
+
+    speed:
+      settings[difficulty].speed,
+
+    jumpPower:
+      settings[difficulty].jump,
+
+    velocityY:0,
+
+    onGround:false,
+
+    crouching:false,
+
+    walkPhase:0
+
+  };
+
+}
+
+
+let player;
+
+let mushrooms = [];
+
+let enemies = [];
+
+let spikes = [];
+
+let platforms = [];
+
+let shields = [];
+
+let tunnels = [];
+
+let boss = null;
+
+let goal = null;
+
+
+/* =========================
+   LOAD LEVEL
+========================= */
+
+function loadLevel(n){
+
+  if(n > unlockedLevel)
+    return;
+
+
+  cancelAnimationFrame(
+    animationId
+  );
+
+
+  level = n;
+
+  lives =
+    settings[difficulty].lives;
+
+  shield = 0;
+
+  gameRunning = true;
+
+  invulnerableUntil = 0;
+
+  resetKeys();
+
+
+  player =
+    makePlayer();
+
+
+  mushrooms = [];
+
+  enemies = [];
+
+  spikes = [];
+
+  platforms = [];
+
+  shields = [];
+
+  tunnels = [];
+
+  boss = null;
+
+
+  goal = {
+
+    x:35,
+
+    y:405,
+
+    width:45,
+
+    height:45
+
+  };
+
+
+  buildLevel(n);
+
+  gameOver
+    .classList
+    .add("hidden");
+
+
+  createLevelButtons();
+
+  updateUI();
+
+
+  messageEl.textContent =
+    `ด่าน ${n}: ${info[n].name} — เก็บเห็ดให้ครบ`;
+
+
+  animationId =
+    requestAnimationFrame(
+      gameLoop
+    );
+
+}
+
+
+/* =========================
+   BUILD LEVEL
+========================= */
+
+function buildLevel(lv){
+
+  platforms.push({
+
+    x:0,
+    y:450,
+    width:900,
+    height:50
+
+  });
+
+
+  platforms.push({
+
+    x:110,
+    y:370,
+    width:130,
+    height:20
+
+  });
+
+
+  platforms.push({
+
+    x:330,
+    y:300,
+    width:150,
+    height:20
+
+  });
+
+
+  platforms.push({
+
+    x:590,
+    y:370,
+    width:140,
+    height:20
+
+  });
+
+
+  if(lv >= 3){
+
+    platforms.push({
+
+      x:180,
+      y:220,
+      width:140,
+      height:20
+
+    });
+
+
+    platforms.push({
+
+      x:480,
+      y:170,
+      width:140,
+      height:20
+
+    });
+
+  }
+
+
+  if(lv >= 4){
+
+    platforms.push({
+
+      x:30,
+      y:270,
+      width:120,
+      height:20
+
+    });
+
+
+    platforms.push({
+
+      x:730,
+      y:240,
+      width:120,
+      height:20
+
+    });
+
+  }
+
+
+  /* เห็ด */
+
+  const positions = [
+
+    [70,415],
+    [145,335],
+    [370,265],
+    [620,335],
+    [790,415],
+
+    [210,185],
+    [520,135],
+    [80,235],
+    [760,205],
+    [450,415],
+
+    [310,415],
+    [680,415]
+
+  ];
+
+
+  for(
+    let i=0;
+    i<info[lv].mushrooms;
+    i++
+  ){
+
+    mushrooms.push({
+
+      x:positions[i][0],
+
+      y:positions[i][1],
+
+      width:22,
+
+      height:22,
+
+      collected:false
+
+    });
+
+  }
+
+
+  /* โล่ */
+
+  shields.push({
+
+    x:285,
+
+    y:335,
+
+    width:24,
+
+    height:24,
+
+    collected:false
+
+  });
+
+
+  if(lv >= 3){
+
+    shields.push({
+
+      x:700,
+
+      y:335,
+
+      width:24,
+
+      height:24,
+
+      collected:false
+
+    });
+
+  }
+
+
+  /* หนาม */
+
+  spikes.push({
+
+    x:370,
+
+    y:430,
+
+    width:70,
+
+    height:20
+
+  });
+
+
+  if(lv >= 2){
+
+    spikes.push({
+
+      x:610,
+
+      y:430,
+
+      width:70,
+
+      height:20
+
+    });
+
+  }
+
+
+  if(lv >= 4){
+
+    spikes.push({
+
+      x:150,
+
+      y:430,
+
+      width:60,
+
+      height:20
+
+    });
+
+  }
+
+
+  /* อุโมงค์ */
+
+  tunnels.push({
+
+    x:250,
+
+    y:390,
+
+    width:90,
+
+    height:30
+
+  });
+
+
+  if(lv >= 4){
+
+    tunnels.push({
+
+      x:680,
+
+      y:390,
+
+      width:80,
+
+      height:30
+
+    });
+
+  }
+
+
+  /* ศัตรู */
+
+  for(
+    let i=0;
+    i<info[lv].enemies;
+    i++
+  ){
+
+    enemies.push({
+
+      x:230+i*125,
+
+      y:415,
+
+      width:42,
+
+      height:35,
+
+      speed:
+        settings[difficulty].enemy
+        + lv*.15,
+
+      minX:
+        190+i*25,
+
+      maxX:
+        420+i*65,
+
+      direction:
+        i%2 ? -1 : 1
+
+    });
+
+  }
+
+
+  /* บอส */
+
+  if(lv === 5){
+
+    boss = {
+
+      x:730,
+
+      y:110,
+
+      width:90,
+
+      height:90,
+
+      health:5,
+
+      maxHealth:5,
+
+      speed:
+        difficulty === "hard"
+        ? 2.0
+        : 1.4,
+
+      direction:-1
+
+    };
+
+  }
+
+}
+
+
+/* =========================
+   COLLISION
+========================= */
+
+function overlap(a,b){
+
+  return (
+
+    a.x <
+      b.x+b.width &&
+
+    a.x+a.width >
+      b.x &&
+
+    a.y <
+      b.y+b.height &&
+
+    a.y+a.height >
+      b.y
+
+  );
+
+}
+
+
+/* =========================
+   UPDATE PLAYER
+========================= */
+
+function updatePlayer(){
+
+  const oldBottom =
+    player.y+
+    player.height;
+
+
+  if(keys.a)
+    player.x -=
+      player.speed;
+
+
+  if(keys.d)
+    player.x +=
+      player.speed;
+
+
+  player.x =
+    Math.max(
+      0,
+      Math.min(
+        900-player.width,
+        player.x
+      )
+    );
+
+
+  /* กระโดด */
+
+  if(
+    keys.w &&
+    player.onGround &&
+    !player.crouching
+  ){
+
+    player.velocityY =
+      player.jumpPower;
+
+    player.onGround =
+      false;
+
+    keys.w = false;
+
+  }
+
+
+  /* ก้ม */
+
+  if(
+    keys.s &&
+    player.onGround
+  ){
+
+    if(!player.crouching){
+
+      player.y +=
+        player.normalHeight -
+        player.crouchHeight;
+
+      player.height =
+        player.crouchHeight;
+
+      player.crouching =
+        true;
+
+    }
+
+  }
+
+
+  /* ยืน */
+
+  else if(
+    !keys.s &&
+    player.crouching &&
+    player.onGround
+  ){
+
+    player.y -=
+      player.normalHeight -
+      player.crouchHeight;
+
+    player.height =
+      player.normalHeight;
+
+    player.crouching =
+      false;
+
+  }
+
+
+  /* Gravity */
+
+  player.velocityY =
+    Math.min(
+      12,
+      player.velocityY+0.55
+    );
+
+
+  player.y +=
+    player.velocityY;
+
+
+  player.onGround =
+    false;
+
+
+  /* พื้น/แพลตฟอร์ม */
+
+  for(const p of platforms){
+
+    if(
+
+      player.x+
+        player.width >
+        p.x &&
+
+      player.x <
+        p.x+p.width &&
+
+      oldBottom <= p.y &&
+
+      player.y+
+        player.height >=
+        p.y &&
+
+      player.velocityY >= 0
+
+    ){
+
+      player.y =
+        p.y-player.height;
+
+      player.velocityY = 0;
+
+      player.onGround = true;
+
+    }
+
+  }
+
+
+  if(player.y > 540){
+
+    loseLife();
+
+    return;
+
+  }
+
+
+  /* อุโมงค์ */
+
+  for(const t of tunnels){
+
+    const horizontal =
+
+      player.x <
+        t.x+t.width &&
+
+      player.x+
+        player.width >
+        t.x;
+
+
+    const ceiling =
+
+      player.y <
+        t.y+t.height &&
+
+      player.y+
+        player.height >
+        t.y;
+
+
+    if(
+      horizontal &&
+      ceiling &&
+      !player.crouching
+    ){
+
+      loseLife();
+
+      return;
+
+    }
+
+  }
+
+
+  if(
+    player.y+
+      player.height >
+      450
+  ){
+
+    player.y =
+      450-player.height;
+
+    player.velocityY = 0;
+
+    player.onGround = true;
+
+  }
+
+
+  if(keys.a || keys.d){
+
+    player.walkPhase += .25;
+
+  }
+
+}
+
+
+/* =========================
+   ENEMIES
+========================= */
+
+function updateEnemies(){
+
+  for(const e of enemies){
+
+    e.x +=
+      e.speed*
+      e.direction;
+
+
+    if(
+      e.x<e.minX ||
+      e.x>e.maxX
+    ){
+
+      e.direction *= -1;
+
+      e.x =
+        Math.max(
+          e.minX,
+          Math.min(
+            e.maxX,
+            e.x
+          )
+        );
+
+    }
+
+  }
+
+
+  if(boss){
+
+    boss.x +=
+      boss.speed*
+      boss.direction;
+
+
+    if(
+      boss.x<570 ||
+      boss.x>790
+    ){
+
+      boss.direction *= -1;
+
+      boss.x =
+        Math.max(
+          570,
+          Math.min(
+            790,
+            boss.x
+          )
+        );
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   COLLECT ITEMS
+========================= */
+
+function collectItems(){
+
+  for(const m of mushrooms){
+
+    if(
+      !m.collected &&
+      overlap(player,m)
+    ){
+
+      m.collected = true;
+
+    }
+
+  }
+
+
+  for(const s of shields){
+
+    if(
+      !s.collected &&
+      overlap(player,s)
+    ){
+
+      s.collected = true;
+
+      shield = 1;
+
+      messageEl.textContent =
+        "🛡️ ได้โล่!";
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   DAMAGE
+========================= */
+
+function damage(){
+
+  if(!gameRunning)
+    return;
+
+
+  if(
+    performance.now() <
+    invulnerableUntil
+  )
+    return;
+
+
+  invulnerableUntil =
+    performance.now()+1000;
+
+
+  if(shield > 0){
+
+    shield = 0;
+
+    player.velocityY = -6;
+
+    messageEl.textContent =
+      "🛡️ โล่ช่วยไว้!";
+
+    return;
+
+  }
+
+
+  loseLife();
+
+}
+
+
+function checkHazards(){
+
+  if(
+    performance.now() <
+    invulnerableUntil
+  )
+    return;
+
+
+  for(const s of spikes){
+
+    if(overlap(player,s)){
+
+      damage();
+
+      return;
+
+    }
+
+  }
+
+
+  for(const e of enemies){
+
+    if(overlap(player,e)){
+
+      damage();
+
+      return;
+
+    }
+
+  }
+
+
+  /* บอส */
+
+  if(
+    boss &&
+    overlap(player,boss)
+  ){
+
+    const stomp =
+
+      player.velocityY > 0 &&
+
+      player.y+
+        player.height <=
+        boss.y+28 &&
+
+      player.x+
+        player.width >
+        boss.x &&
+
+      player.x <
+        boss.x+
+        boss.width;
+
+
+    if(stomp){
+
+      boss.health--;
+
+      player.velocityY = -8;
+
+      messageEl.textContent =
+        `💥 โจมตีบอส! เหลือ ${boss.health} HP`;
+
+
+      if(boss.health <= 0){
+
+        boss = null;
+
+        messageEl.textContent =
+          "👑 กำจัดบอสแล้ว!";
+
+      }
+
+    }
+
+    else{
+
+      damage();
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   LOSE LIFE
+========================= */
+
+function loseLife(){
+
+  if(!gameRunning)
+    return;
+
+
+  lives--;
+
+  resetKeys();
+
+
+  player.x = 35;
+
+  player.y =
+    450-player.normalHeight;
+
+  player.height =
+    player.normalHeight;
+
+  player.crouching = false;
+
+  player.velocityY = 0;
+
+  player.onGround = true;
+
+
+  if(lives <= 0){
+
+    gameRunning = false;
+
+    messageEl.textContent =
+      "💀 GAME OVER";
+
+
+    gameOver
+      .classList
+      .remove("hidden");
+
+  }
+
+  else{
+
+    messageEl.textContent =
+      `💥 โดนโจมตี! เหลือ ❤️ ${lives}`;
+
+  }
+
+
+  updateUI();
+
+}
+
+
+/* =========================
+   CHECK GOAL
+========================= */
+
+function checkGoal(){
+
+  if(
+    !goal ||
+    !overlap(player,goal)
+  )
+    return;
+
+
+  /*
+    ไม่ต้องมีเควส
+    แค่เก็บเห็ดครบก็ผ่าน
+  */
+
+  if(
+    mushrooms.every(
+      m => m.collected
+    )
+  ){
+
+    completeLevel();
+
+  }
+
+  else{
+
+    const left =
+      mushrooms.filter(
+        m => !m.collected
+      ).length;
+
+
+    messageEl.textContent =
+      `ยังเหลือเห็ดอีก ${left} ดอก`;
+
+  }
+
+}
+
+
+/* =========================
+   COMPLETE LEVEL
+========================= */
+
+function completeLevel(){
+
+  if(!gameRunning)
+    return;
+
+
+  gameRunning = false;
+
+  resetKeys();
+
+
+  if(level < 5){
+
+    unlockedLevel =
+      Math.max(
+        unlockedLevel,
+        level+1
+      );
+
+
+    localStorage.setItem(
+      "mushroomBoyUnlocked",
+      String(unlockedLevel)
+    );
+
+
+    messageEl.textContent =
+      `🎉 ผ่านด่าน ${level}! ปลดล็อกด่าน ${level+1}`;
+
+  }
+
+  else{
+
+    messageEl.textContent =
+      "🏆 ยินดีด้วย! ผ่านครบทั้ง 5 ด่านแล้ว!";
+
+  }
+
+
+  createLevelButtons();
+
+  updateUI();
+
+}
+
+
+/* =========================
+   UPDATE UI
+========================= */
+
+function updateUI(){
+
+  livesEl.textContent =
+    lives;
+
+
+  mushroomsEl.textContent =
+
+    `${mushrooms.filter(
+      m => m.collected
+    ).length}/${mushrooms.length}`;
+
+
+  shieldEl.textContent =
+    shield;
+
+
+  levelTextEl.textContent =
+    level;
+
+
+  difficultyTextEl.textContent =
+    difficulty === "easy"
+    ? "ง่าย"
+    : "ยาก";
+
+}
+
+
+/* =========================
+   DRAW BACKGROUND
+========================= */
+
+function drawBackground(){
+
+  ctx.fillStyle =
+
+    level === 4
+    ? "#684634"
+
+    : level === 5
+    ? "#34344d"
+
+    : "#87ceeb";
+
+
+  ctx.fillRect(
+    0,
+    0,
+    900,
+    500
+  );
+
+
+  ctx.fillStyle =
+
+    level === 5
+    ? "#55516d"
+    : "#68ad4b";
+
+
+  ctx.fillRect(
+    0,
+    450,
+    900,
+    50
+  );
+
+
+  if(level === 4){
+
+    ctx.fillStyle =
+      "#d35400";
+
+    ctx.fillRect(
+      0,
+      480,
+      900,
+      20
+    );
+
+  }
+
+}
+
+
+/* =========================
+   DRAW WORLD
+========================= */
+
+function drawWorld(){
+
+  for(const p of platforms){
+
+    if(p.y === 450)
+      continue;
+
+
+    ctx.fillStyle =
+      "#654321";
+
+
+    ctx.fillRect(
+      p.x,
+      p.y,
+      p.width,
+      p.height
+    );
+
+
+    ctx.fillStyle =
+      "#4d9b43";
+
+
+    ctx.fillRect(
+      p.x,
+      p.y,
+      p.width,
+      5
+    );
+
+  }
+
+
+  for(const t of tunnels){
+
+    ctx.fillStyle =
+      "#444";
+
+
+    ctx.fillRect(
+      t.x,
+      t.y,
+      t.width,
+      t.height
+    );
+
+
+    ctx.fillStyle =
+      "#222";
+
+
+    ctx.fillRect(
+      t.x+8,
+      t.y+8,
+      t.width-16,
+      t.height-8
+    );
+
+  }
+
+
+  for(const s of spikes){
+
+    ctx.fillStyle =
+      "#eee";
+
+
+    for(
+      let i=0;
+      i<Math.floor(s.width/14);
+      i++
+    ){
+
+      const x =
+        s.x+i*14;
+
+
+      ctx.beginPath();
+
+      ctx.moveTo(
+        x,
+        s.y+s.height
+      );
+
+      ctx.lineTo(
+        x+7,
+        s.y
+      );
+
+      ctx.lineTo(
+        x+14,
+        s.y+s.height
+      );
+
+      ctx.fill();
+
+    }
+
+  }
+
+}
+
+
+/* =========================
+   DRAW MUSHROOMS
+========================= */
+
+function drawMushrooms(){
+
+  for(const m of mushrooms){
+
+    if(m.collected)
+      continue;
+
+
+    ctx.fillStyle =
+      "#fff";
+
+
+    ctx.fillRect(
+      m.x+7,
+      m.y+9,
+      8,
+      13
+    );
+
+
+    ctx.fillStyle =
+      "#e53935";
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+      m.x+11,
+      m.y+9,
+      11,
+      Math.PI,
+      0
+    );
+
+    ctx.fill();
+
+
+    ctx.fillStyle =
+      "#fff";
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+      m.x+7,
+      m.y+7,
+      2.5,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+      m.x+15,
+      m.y+5,
+      2.5,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+  }
+
+}
+
+
+/* =========================
+   DRAW SHIELD
+========================= */
+
+function drawShields(){
+
+  for(const s of shields){
+
+    if(s.collected)
+      continue;
+
+
+    ctx.fillStyle =
+      "#2196f3";
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+      s.x+12,
+      s.y+12,
+      12,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+
+    ctx.fillStyle =
+      "#fff";
+
+
+    ctx.font =
+      "16px Arial";
+
+
+    ctx.fillText(
+      "S",
+      s.x+7,
+      s.y+18
+    );
+
+  }
+
+}
+
+
+/* =========================
+   DRAW ENEMIES
+========================= */
+
+function drawEnemies(){
+
+  for(const e of enemies){
+
+    ctx.fillStyle =
+      "#7b2cbf";
+
+
+    ctx.fillRect(
+      e.x,
+      e.y,
+      e.width,
+      e.height
+    );
+
+
+    ctx.fillStyle =
+      "#fff";
+
+
+    ctx.fillRect(
+      e.x+8,
+      e.y+8,
+      7,
+      7
+    );
+
+
+    ctx.fillRect(
+      e.x+27,
+      e.y+8,
+      7,
+      7
+    );
+
+  }
+
+}
+
+
+/* =========================
+   DRAW BOSS
+========================= */
+
+function drawBoss(){
+
+  if(!boss)
+    return;
+
+
+  ctx.fillStyle =
+    "#8e24aa";
+
+
+  ctx.fillRect(
+    boss.x,
+    boss.y,
+    boss.width,
+    boss.height
+  );
+
+
+  ctx.fillStyle =
+    "#fff";
+
+
+  ctx.fillRect(
+    boss.x+18,
+    boss.y+20,
+    16,
+    16
+  );
+
+
+  ctx.fillRect(
+    boss.x+56,
+    boss.y+20,
+    16,
+    16
+  );
+
+
+  ctx.fillStyle =
+    "#111";
+
+
+  ctx.fillRect(
+    boss.x+24,
+    boss.y+26,
+    7,
+    7
+  );
+
+
+  ctx.fillRect(
+    boss.x+62,
+    boss.y+26,
+    7,
+    7
+  );
+
+
+  /* Boss HP */
+
+  ctx.fillStyle =
+    "#222";
+
+
+  ctx.fillRect(
+    650,
+    20,
+    200,
+    16
+  );
+
+
+  ctx.fillStyle =
+    "#f44336";
+
+
+  ctx.fillRect(
+    650,
+    20,
+    200*
+    boss.health/
+    boss.maxHealth,
+    16
+  );
+
+
+  ctx.strokeStyle =
+    "#fff";
+
+
+  ctx.strokeRect(
+    650,
+    20,
+    200,
+    16
+  );
+
+}
+
+
+/* =========================
+   DRAW GOAL
+========================= */
+
+function drawGoal(){
+
+  ctx.fillStyle =
+    "#ffd54f";
+
+
+  ctx.fillRect(
+    goal.x,
+    goal.y,
+    goal.width,
+    goal.height
+  );
+
+
+  ctx.fillStyle =
+    "#222";
+
+
+  ctx.font =
+    "20px Arial";
+
+
+  ctx.fillText(
+    "🏁",
+    goal.x+7,
+    goal.y+28
+  );
+
+}
+
+
+/* =========================
+   DRAW PLAYER
+========================= */
+
+function drawPlayer(){
+
+  /*
+    กระพริบตอนเพิ่งโดนโจมตี
+  */
+
+  if(
+
+    performance.now() <
+      invulnerableUntil &&
+
+    Math.floor(
+      performance.now()/100
+    ) % 2 === 0
+
+  ){
+
+    return;
+
+  }
+
+
+  const x = player.x;
+
+  const y = player.y;
+
+  const phase =
+    Math.sin(
+      player.walkPhase
+    )*5;
+
+
+  ctx.save();
+
+  ctx.lineCap =
+    "round";
+
+  ctx.strokeStyle =
+    "#222";
+
+  ctx.lineWidth = 6;
+
+
+  /*
+    =====================
+    ขา + แขน
+    =====================
+  */
+
+  /* กระโดด */
+
+  if(!player.onGround){
+
+    ctx.beginPath();
+
+    /* ขา */
+
+    ctx.moveTo(
+      x+10,
+      y+42
+    );
+
+    ctx.lineTo(
+      x+4,
+      y+52
+    );
+
+
+    ctx.moveTo(
+      x+24,
+      y+42
+    );
+
+    ctx.lineTo(
+      x+30,
+      y+52
+    );
+
+
+    /* แขน */
+
+    ctx.moveTo(
+      x+5,
+      y+27
+    );
+
+    ctx.lineTo(
+      x-3,
+      y+18
+    );
+
+
+    ctx.moveTo(
+      x+29,
+      y+27
+    );
+
+    ctx.lineTo(
+      x+37,
+      y+18
+    );
+
+
+    ctx.stroke();
+
+  }
+
+  /* ก้ม */
+
+  else if(player.crouching){
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      x+10,
+      y+23
+    );
+
+    ctx.lineTo(
+      x+2,
+      y+29
+    );
+
+
+    ctx.moveTo(
+      x+24,
+      y+23
+    );
+
+    ctx.lineTo(
+      x+32,
+      y+29
+    );
+
+
+    ctx.moveTo(
+      x+6,
+      y+18
+    );
+
+    ctx.lineTo(
+      x-1,
+      y+25
+    );
+
+
+    ctx.moveTo(
+      x+28,
+      y+18
+    );
+
+    ctx.lineTo(
+      x+35,
+      y+25
+    );
+
+
+    ctx.stroke();
+
+  }
+
+  /* ยืน / เดิน */
+
+  else{
+
+    ctx.beginPath();
+
+    /* ขา */
+
+    ctx.moveTo(
+      x+10,
+      y+42
+    );
+
+    ctx.lineTo(
+      x+8+phase,
+      y+54
+    );
+
+
+    ctx.moveTo(
+      x+24,
+      y+42
+    );
+
+    ctx.lineTo(
+      x+26-phase,
+      y+54
+    );
+
+
+    /* แขน */
+
+    ctx.moveTo(
+      x+5,
+      y+27
+    );
+
+    ctx.lineTo(
+      x-2-phase,
+      y+35
+    );
+
+
+    ctx.moveTo(
+      x+29,
+      y+27
+    );
+
+    ctx.lineTo(
+      x+36+phase,
+      y+20
+    );
+
+
+    ctx.stroke();
+
+  }
+
+
+  /*
+    หัว
+  */
+
+  ctx.fillStyle =
+    "#ffcc80";
+
+
+  ctx.beginPath();
+
+  ctx.arc(
+    x+17,
+    y+10,
+    11,
+    0,
+    Math.PI*2
+  );
+
+  ctx.fill();
+
+
+  /*
+    ผม
+  */
+
+  ctx.fillStyle =
+    "#5d4037";
+
+
+  ctx.beginPath();
+
+  ctx.arc(
+    x+17,
+    y+4,
+    11,
+    Math.PI,
+    0
+  );
+
+  ctx.fill();
+
+
+  /*
+    เสื้อ
+  */
+
+  ctx.fillStyle =
+    "#1976d2";
+
+
+  ctx.fillRect(
+    x+4,
+    y+21,
+    26,
+    23
+  );
+
+
+  /*
+    ตา
+  */
+
+  ctx.fillStyle =
+    "#111";
+
+
+  ctx.fillRect(
+    x+12,
+    y+8,
+    3,
+    3
+  );
+
+
+  ctx.fillRect(
+    x+21,
+    y+8,
+    3,
+    3
+  );
+
+
+  ctx.restore();
+
+}
+
+
+/* =========================
+   DRAW
+========================= */
+
+function draw(){
+
+  ctx.clearRect(
+    0,
+    0,
+    900,
+    500
+  );
+
+
+  drawBackground();
+
+  drawWorld();
+
+  drawGoal();
+
+  drawMushrooms();
+
+  drawShields();
+
+  drawEnemies();
+
+  drawBoss();
+
+  drawPlayer();
+
+}
+
+
+/* =========================
+   GAME LOOP
+========================= */
+
+function gameLoop(){
+
+  if(gameRunning){
+
+    updatePlayer();
+
+    updateEnemies();
+
+    collectItems();
+
+    checkHazards();
+
+    checkGoal();
+
+    updateUI();
+
+  }
+
+
+  draw();
+
+
+  animationId =
+    requestAnimationFrame(
+      gameLoop
+    );
+
+}
+
+
+/* =========================
+   INITIAL
+========================= */
+
+createLevelButtons();
+
+</script>
+
+</body>
+</html>
+```
