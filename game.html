@@ -2,82 +2,366 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Obby Game - End Game & Background</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Obby Game - Neon Star Edition</title>
     <style>
-        body { margin: 0; background-color: #111; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
-        #game-container { position: relative; width: 360px; height: 640px; border: 4px solid #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 0 30px rgba(0, 229, 255, 0.4); background-color: #0f0c29; }
+        :root {
+            --neon-blue: #00e5ff;
+            --neon-pink: #ff007f;
+            --neon-purple: #b000ff;
+            --gold: #ffd700;
+            --bg-dark: #0b0c10;
+            --panel-bg: rgba(11, 12, 16, 0.85);
+        }
+
+        body { 
+            margin: 0; 
+            background-color: #000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            color: white; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            overflow: hidden; 
+            touch-action: none; 
+        }
+        
+        #game-container { 
+            position: relative; 
+            width: 360px; 
+            height: 640px; 
+            border: 2px solid var(--neon-blue); 
+            border-radius: 16px; 
+            overflow: hidden; 
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.3), inset 0 0 10px rgba(0,229,255,0.2); 
+            background-color: var(--bg-dark); 
+            transition: background-image 0.8s ease-in-out; 
+            background-size: cover; 
+            background-position: center; 
+        }
+        
         canvas { display: block; }
         
-        #ui { position: absolute; top: 15px; left: 15px; right: 15px; display: none; justify-content: space-between; font-weight: bold; font-size: 16px; color: white; text-shadow: 1px 1px 2px black; z-index: 10; }
+        /* UI Elements */
+        .overlay {
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 20; 
+            backdrop-filter: blur(8px);
+            background: var(--panel-bg);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Start Screen */
+        #startScreen { background: linear-gradient(135deg, rgba(11,12,16,0.95), rgba(31,40,51,0.95)); }
+        .logo-container { width: 100px; height: 100px; margin-bottom: 20px; animation: float 3s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+        h1.title { margin: 0; font-size: 42px; color: var(--neon-blue); text-shadow: 0 0 15px var(--neon-blue), 0 0 30px var(--neon-purple); text-align: center; line-height: 1.1; font-weight: 900; letter-spacing: 2px; }
+        .subtitle { color: #c5c6c7; margin-top: 15px; font-size: 14px; text-align: center; line-height: 1.6; padding: 0 20px; }
         
+        /* Buttons */
+        .btn-action { 
+            margin-top: 20px; padding: 15px 35px; font-size: 18px; font-weight: bold; border: none; border-radius: 30px; 
+            background: transparent; color: var(--neon-blue); cursor: pointer; 
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.4), inset 0 0 10px rgba(0,229,255,0.2); 
+            transition: all 0.2s; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .btn-action:active { transform: scale(0.95); background: var(--neon-blue); color: #000; }
+        .btn-action.gold { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 10px rgba(255,215,0,0.4); }
+        .btn-action.gold:active { background: var(--gold); color: #000; }
+        .btn-action.pink { border-color: var(--neon-pink); color: var(--neon-pink); box-shadow: 0 0 10px rgba(255,0,127,0.4); }
+        .btn-action.pink:active { background: var(--neon-pink); color: #000; }
+
+        /* Level Select Screen */
+        #levelSelectScreen h2 { color: var(--neon-purple); text-shadow: 0 0 10px var(--neon-purple); font-size: 28px; margin-bottom: 30px; margin-top: 0;}
+        .level-grid { display: flex; flex-direction: column; gap: 15px; width: 80%; }
+        .level-card { 
+            background: rgba(255,255,255,0.05); border: 2px solid #333; border-radius: 12px; padding: 15px; 
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s;
+        }
+        .level-card.unlocked { border-color: var(--neon-blue); box-shadow: 0 0 10px rgba(0,229,255,0.2); }
+        .level-card.unlocked:active { transform: scale(0.97); background: rgba(0,229,255,0.1); }
+        .level-card.locked { opacity: 0.5; cursor: not-allowed; }
+        .level-info { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: bold; }
+        .level-stars { color: var(--gold); font-size: 18px; letter-spacing: 2px; }
+
+        /* In-Game UI */
+        #gameUI { position: absolute; top: 15px; left: 15px; right: 15px; display: none; justify-content: space-between; font-weight: bold; font-size: 16px; color: white; text-shadow: 1px 1px 4px black, 0 0 5px var(--neon-blue); z-index: 10; }
         .controls { position: absolute; bottom: 20px; width: 100%; display: none; justify-content: space-evenly; z-index: 10; }
-        button.ctrl-btn { width: 60px; height: 60px; border-radius: 50%; font-size: 20px; border: none; background: rgba(255,255,255,0.3); color: white; font-weight: bold; cursor: pointer; user-select: none; touch-action: manipulation; transition: background 0.1s; border: 2px solid rgba(255,255,255,0.5); }
-        button.ctrl-btn:active { background: rgba(0, 229, 255, 0.8); color: black; border-color: #00e5ff; }
+        button.ctrl-btn { 
+            width: 65px; height: 65px; border-radius: 50%; font-size: 22px; border: 2px solid rgba(255,255,255,0.4); 
+            background: rgba(0,0,0,0.4); color: white; font-weight: bold; cursor: pointer; user-select: none; 
+            touch-action: manipulation; transition: all 0.1s; backdrop-filter: blur(4px); box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        button.ctrl-btn:active { background: rgba(0, 229, 255, 0.6); color: white; border-color: var(--neon-blue); transform: translateY(2px); box-shadow: 0 0 15px var(--neon-blue); }
 
-        /* พื้นหลังหน้า Start */
-        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 20; }
-        #startScreen h1 { margin: 0; font-size: 40px; color: #00e5ff; text-shadow: 0 0 15px #00e5ff; text-align: center; }
-        #startScreen p { color: #ccc; margin-top: 15px; font-size: 14px; text-align: center; line-height: 1.6; }
+        /* Music Toggle */
+        .music-toggle { position: absolute; top: 10px; right: 10px; z-index: 50; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.3); border-radius: 20px; padding: 5px 15px; color: white; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(4px); transition: all 0.2s; }
+        .music-toggle:active { transform: scale(0.9); border-color: var(--neon-blue); box-shadow: 0 0 10px var(--neon-blue); }
+
+        /* --- NEW: Unlock Cinematic Screen --- */
+        #unlockScreen {
+            background: radial-gradient(circle, rgba(30,10,40,0.98) 0%, rgba(10,5,15,0.98) 100%);
+        }
+        .padlock-wrapper { position: relative; margin-bottom: 50px; }
+        .padlock {
+            position: relative; width: 70px; height: 50px;
+            background: linear-gradient(to bottom, #ffd700, #ffaa00);
+            border-radius: 8px; box-shadow: 0 10px 20px rgba(0,0,0,0.6), inset 0 2px 5px rgba(255,255,255,0.5);
+            display: flex; justify-content: center; align-items: center; z-index: 2;
+        }
+        .padlock::after {
+            content: ''; width: 12px; height: 18px; background: #222; border-radius: 6px 6px 4px 4px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+        }
+        .padlock-shackle {
+            position: absolute; top: -35px; left: 10px; width: 50px; height: 40px;
+            border: 10px solid #d4d4d4; border-bottom: none; border-radius: 25px 25px 0 0;
+            box-sizing: border-box; z-index: 1; transform-origin: right bottom;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
         
-        /* พื้นหลังหน้า End Game สรุปผล */
-        #endScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #4b134f 0%, #c94b4b 100%); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 30; }
-        #endScreen h1 { margin: 0; font-size: 42px; color: #ffd700; text-shadow: 0 0 20px #ffaa00; text-align: center; }
-        .stats-box { background: rgba(0,0,0,0.5); padding: 20px; border-radius: 15px; margin: 20px 0; border: 2px solid #ffd700; width: 70%; text-align: center; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
-        .stats-box p { margin: 10px 0; font-size: 20px; font-weight: bold; color: white; }
-        .stats-box span { color: #00ffcc; font-size: 24px; }
-        .stats-box .score-val { color: #ff3333; font-size: 28px; text-shadow: 1px 1px 2px white; }
+        .padlock-wrapper.shaking { animation: padlockShake 0.1s infinite; }
+        @keyframes padlockShake {
+            0%, 100% { transform: translate(0, 0) rotate(0); }
+            25% { transform: translate(-4px, 2px) rotate(-4deg); }
+            75% { transform: translate(4px, -2px) rotate(4deg); }
+        }
+        .padlock-wrapper.unlocking .padlock-shackle {
+            transform: translateY(-25px) rotate(25deg);
+        }
 
-        .btn-action { margin-top: 20px; padding: 15px 40px; font-size: 20px; font-weight: bold; border: none; border-radius: 30px; background: #00e5ff; color: #111; cursor: pointer; box-shadow: 0 5px 15px rgba(0, 229, 255, 0.4); transition: transform 0.2s, background 0.2s; }
-        .btn-action:active { transform: scale(0.95); }
-        #btnRestart { background: #ffd700; box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4); }
+        #unlockText { font-size: 32px; font-weight: 900; color: var(--neon-blue); text-shadow: 0 0 15px var(--neon-blue), 0 0 30px var(--neon-blue); opacity: 0; transition: opacity 0.5s; text-align: center; margin-bottom: 30px; letter-spacing: 2px;}
+        #btnContinueUnlock { opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+
+
+        /* Stage Clear & Game Over Overlays */
+        #stageClearScreen h1 { color: var(--gold); text-shadow: 0 0 20px var(--gold); font-size: 36px; margin: 0; text-align: center; }
+        #gameOverScreen h1 { color: var(--neon-pink); text-shadow: 0 0 20px var(--neon-pink); font-size: 40px; margin: 0; }
+        .stats-box { background: rgba(0,0,0,0.6); padding: 20px; border-radius: 15px; margin: 20px 0; border: 1px solid rgba(255,255,255,0.2); width: 75%; text-align: center; }
+        .stats-box p { margin: 5px 0; color: #aaa; font-size: 14px; }
+        .stats-box .val { color: white; font-size: 24px; font-weight: bold; text-shadow: 0 0 5px rgba(255,255,255,0.5); margin-bottom: 15px; }
+        
+        .big-stars { display: flex; justify-content: center; gap: 10px; margin: 15px 0; font-size: 40px; color: #444; }
+        .big-stars span { opacity: 0; transform: scale(0.5); transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .big-stars span.earned { color: var(--gold); text-shadow: 0 0 15px var(--gold); opacity: 1; transform: scale(1); }
+        
+        .button-group { display: flex; flex-direction: column; gap: 10px; width: 80%; }
+        
     </style>
 </head>
 <body>
     <div id="game-container">
+        <!-- BGM Toggle Button -->
+        <button class="music-toggle" id="btnMusicToggle">🔇 OFF</button>
+
+        <!-- Canvas -->
         <canvas id="gameCanvas" width="360" height="640"></canvas>
-        <div id="ui">
-            <span id="levelText">Stage 1</span>
-            <span id="timerText">Time: 0.00s</span>
+        
+        <!-- In-Game UI -->
+        <div id="gameUI">
+            <span id="uiLevelText">🌍 Stage 1</span>
+            <span id="uiTimerText">0.00s</span>
         </div>
+        
+        <!-- Controls -->
         <div class="controls" id="controlsDiv">
             <button class="ctrl-btn" id="btnLeft">←</button>
-            <button class="ctrl-btn" id="btnJump">JUMP</button>
+            <button class="ctrl-btn" id="btnJump">↑</button>
             <button class="ctrl-btn" id="btnRight">→</button>
         </div>
 
-        <!-- หน้าจอ Start -->
-        <div id="startScreen">
-            <h1>OBBY<br>SPEEDRUN</h1>
-            <p>Controls: WASD / Arrows / On-screen<br>Avoid Red Lava. Reach the Gold Portal!</p>
-            <button class="btn-action" id="btnStart">START GAME</button>
+        <!-- 1. Start Screen -->
+        <div id="startScreen" class="overlay active">
+            <div class="logo-container">
+                <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%; filter: drop-shadow(0 0 10px #00e5ff);">
+                    <polygon points="50,5 95,30 95,70 50,95 5,70 5,30" stroke="#00e5ff" stroke-width="4" fill="rgba(0, 229, 255, 0.1)"/>
+                    <polygon points="50,20 80,38 80,62 50,80 20,62 20,38" stroke="#ff007f" stroke-width="3" fill="rgba(255, 0, 127, 0.15)"/>
+                    <circle cx="50" cy="50" r="10" fill="#00e5ff" />
+                </svg>
+            </div>
+            <h1 class="title">NEON<br>OBBY</h1>
+            <p class="subtitle">Speedrun the galaxy.<br>Get 3 stars by beating the clock.</p>
+            <button class="btn-action" onclick="showScreen('levelSelectScreen')">PLAY</button>
         </div>
 
-        <!-- หน้าจอ End Game สรุปผล -->
-        <div id="endScreen">
-            <h1>MISSION<br>ACCOMPLISHED!</h1>
-            <div class="stats-box">
-                <p>TOTAL TIME</p>
-                <span id="finalTimeDisplay">0.00s</span>
-                <p style="margin-top:20px;">FINAL SCORE</p>
-                <span class="score-val" id="finalScoreDisplay">0</span>
+        <!-- 2. Level Select Screen -->
+        <div id="levelSelectScreen" class="overlay">
+            <h2>SELECT STAGE</h2>
+            <div class="level-grid" id="levelGrid">
+                <!-- Injected via JS -->
             </div>
-            <button class="btn-action" id="btnRestart">PLAY AGAIN</button>
+            <button class="btn-action pink" style="margin-top: 30px; padding: 10px 30px; font-size:14px;" onclick="showScreen('startScreen')">BACK</button>
+        </div>
+
+        <!-- 3. Cinematic Unlock Screen -->
+        <div id="unlockScreen" class="overlay">
+            <div class="padlock-wrapper" id="padlockWrapper">
+                <div class="padlock-shackle"></div>
+                <div class="padlock"></div>
+            </div>
+            <div id="unlockText">NEW LEVEL<br>UNLOCKED!</div>
+            <button class="btn-action pink" id="btnContinueUnlock" onclick="showStageClearStats()">CONTINUE</button>
+        </div>
+
+        <!-- 4. Stage Clear Screen -->
+        <div id="stageClearScreen" class="overlay">
+            <h1>STAGE CLEAR!</h1>
+            <div class="stats-box">
+                <p>CLEAR TIME</p>
+                <div class="val" id="clearTimeDisplay">0.00s</div>
+                
+                <div class="big-stars" id="clearStarsDisplay">
+                    <span id="star1">★</span>
+                    <span id="star2">★</span>
+                    <span id="star3">★</span>
+                </div>
+                <p id="starHintText" style="color:var(--neon-blue); font-size:12px;">Target: 15s for 3 Stars</p>
+            </div>
+            <div class="button-group">
+                <button class="btn-action gold" id="btnNextLevel" onclick="nextLevel()">NEXT LEVEL</button>
+                <button class="btn-action" onclick="goToMenu()">LEVEL SELECT</button>
+            </div>
+        </div>
+
+        <!-- 5. Game Over Screen -->
+        <div id="gameOverScreen" class="overlay">
+            <h1>WASTED</h1>
+            <p style="color:#aaa; margin-bottom: 30px;">You fell into the abyss.</p>
+            <div class="button-group">
+                <button class="btn-action pink" onclick="restartLevel()">TRY AGAIN</button>
+                <button class="btn-action" onclick="goToMenu()">LEVEL SELECT</button>
+            </div>
         </div>
     </div>
 
     <script>
+        // ================= Core DOM Elements =================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const levelText = document.getElementById('levelText');
-        const timerText = document.getElementById('timerText');
-        const uiDiv = document.getElementById('ui');
+        const gameContainer = document.getElementById('game-container');
+        const uiDiv = document.getElementById('gameUI');
         const controlsDiv = document.getElementById('controlsDiv');
-        const startScreen = document.getElementById('startScreen');
-        const endScreen = document.getElementById('endScreen');
+        
+        // ================= System State =================
+        let gameState = 'START'; // START, MENU, PLAYING, GAMEOVER, STAGE_CLEAR, UNLOCK_SCENE
+        let currentLevel = 0;
+        let startTime = 0;
+        let totalElapsedTime = 0;
+        let cameraY = 0;
+        let tempClearStats = null; // Store stats for passing between scenes
 
-        // ================= ระบบเสียง =================
+        // ================= Audio System (AudioContext) =================
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let isMusicPlaying = false;
+        let musicInitialized = false;
+        const btnMusicToggle = document.getElementById('btnMusicToggle');
+
+        // 8-bit Sequencer variables
+        let currentNote = 0;
+        let nextNoteTime = 0;
+        const tempo = 150; // bpm
+        const lookahead = 25; // ms
+        const scheduleAheadTime = 0.1; // s
+        let timerID;
+
+        // Catchy 8-bit Arpeggio Melody
+        const melody = [
+            329.63, 392.00, 493.88, 659.25, // E G B E
+            261.63, 329.63, 392.00, 523.25, // C E G C
+            293.66, 369.99, 440.00, 587.33, // D F# A D
+            246.94, 329.63, 392.00, 493.88  // B E G B
+        ];
+
+        function nextNote() {
+            const secondsPerBeat = 60.0 / (tempo * 2);
+            nextNoteTime += secondsPerBeat;
+            currentNote = (currentNote + 1) % melody.length;
+        }
+
+        function scheduleNote(noteFreq, time) {
+            if (!isMusicPlaying) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square'; // 8-bit waveform
+            osc.frequency.value = noteFreq;
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            // 8-bit plucky envelope
+            gain.gain.setValueAtTime(0, time);
+            gain.gain.linearRampToValueAtTime(0.05, time + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+            
+            osc.start(time);
+            osc.stop(time + 0.15);
+        }
+
+        function scheduler() {
+            while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+                scheduleNote(melody[currentNote], nextNoteTime);
+                nextNote();
+            }
+            if (isMusicPlaying) {
+                timerID = setTimeout(scheduler, lookahead);
+            }
+        }
+
+        function startMusic() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (isMusicPlaying) return;
+            isMusicPlaying = true;
+            musicInitialized = true;
+            
+            btnMusicToggle.innerText = '🎵 ON';
+            btnMusicToggle.style.borderColor = 'var(--neon-blue)';
+            btnMusicToggle.style.boxShadow = '0 0 10px var(--neon-blue)';
+            
+            if (nextNoteTime === 0 || nextNoteTime < audioCtx.currentTime) {
+                nextNoteTime = audioCtx.currentTime + 0.05;
+            }
+            scheduler();
+        }
+
+        function stopMusic() {
+            isMusicPlaying = false;
+            clearTimeout(timerID);
+            
+            btnMusicToggle.innerText = '🔇 OFF';
+            btnMusicToggle.style.borderColor = 'rgba(255,255,255,0.3)';
+            btnMusicToggle.style.boxShadow = 'none';
+        }
+
+        btnMusicToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isMusicPlaying) {
+                stopMusic();
+            } else {
+                startMusic();
+            }
+        });
+
+        // Initialize music on first interaction anywhere
+        document.body.addEventListener('click', () => {
+            if (!musicInitialized) startMusic();
+        }, { once: true });
+        
+        document.body.addEventListener('touchstart', () => {
+            if (!musicInitialized) startMusic();
+        }, { once: true });
+
         function playSound(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
@@ -97,75 +381,43 @@
                 osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
                 gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
                 osc.start(now); osc.stop(now + 0.3);
-            } else if (type === 'clear') {
-                osc.type = 'square'; osc.frequency.setValueAtTime(300, now); osc.frequency.setValueAtTime(400, now + 0.1); osc.frequency.setValueAtTime(600, now + 0.2);
-                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
-                osc.start(now); osc.stop(now + 0.3);
-            } else if (type === 'win') {
-                osc.type = 'square'; [400, 500, 600, 800, 1000].forEach((freq, i) => { osc.frequency.setValueAtTime(freq, now + i * 0.1); });
-                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.6);
-                osc.start(now); osc.stop(now + 0.6);
+            } else if (type === 'clear' || type === 'star') {
+                osc.type = 'sine'; 
+                const freq = type === 'clear' ? 400 : 800;
+                osc.frequency.setValueAtTime(freq, now); osc.frequency.exponentialRampToValueAtTime(freq*2, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else if (type === 'shake') {
+                // Low rumbling noise for shaking padlock
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(50, now);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'padlock_open') {
+                // Triumphant pop
+                osc.type = 'square'; 
+                [500, 700, 1000].forEach((f, i) => osc.frequency.setValueAtTime(f, now + i*0.1));
+                gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
             }
         }
 
-        // ================= สร้างดาวเป็นพื้นหลัง Parallax =================
-        const stars = Array.from({length: 80}, () => ({
-            x: Math.random() * 360,
-            y: Math.random() * 2000, // กระจายดาวในแกน Y ให้ครอบคลุมความสูงด่าน
-            size: Math.random() * 2 + 1,
-            opacity: Math.random()
-        }));
-
-        let gameState = 'MENU'; 
-        let currentLevel = 0;
-        let startTime = 0;
-        let totalElapsedTime = 0;
-        let finalScore = 0;
-        let cameraY = 0;
-
-        const keys = { left: false, right: false, jump: false };
-        const bindKey = (e, state) => {
-            if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = state;
-            if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = state;
-            if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.jump = state;
-        };
-        window.addEventListener('keydown', e => bindKey(e, true));
-        window.addEventListener('keyup', e => bindKey(e, false));
-
-        const setupBtn = (id, key) => {
-            const btn = document.getElementById(id);
-            btn.addEventListener('mousedown', () => keys[key] = true);
-            btn.addEventListener('mouseup', () => keys[key] = false);
-            btn.addEventListener('mouseleave', () => keys[key] = false);
-            btn.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
-            btn.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
-        };
-        setupBtn('btnLeft', 'left'); setupBtn('btnRight', 'right'); setupBtn('btnJump', 'jump');
-
-        document.getElementById('btnStart').addEventListener('click', () => {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            startScreen.style.display = 'none';
-            uiDiv.style.display = 'flex';
-            controlsDiv.style.display = 'flex';
-            startGame();
-        });
-
-        document.getElementById('btnRestart').addEventListener('click', () => {
-            endScreen.style.display = 'none';
-            uiDiv.style.display = 'flex';
-            controlsDiv.style.display = 'flex';
-            startGame();
-        });
-
-        const player = {
-            x: 0, y: 0, w: 20, h: 20, color: '#00e5ff',
-            dx: 0, dy: 0, speed: 4.5, jumpPower: -12,
-            gravity: 0.45, grounded: false, currentPlatform: null
+        // ================= Progression & Save System =================
+        let progress = JSON.parse(localStorage.getItem('obbyProgressV3')) || {
+            0: { unlocked: true, stars: 0 },
+            1: { unlocked: false, stars: 0 },
+            2: { unlocked: false, stars: 0 }
         };
 
-        let levelObjects = []; 
+        function saveProgress() {
+            localStorage.setItem('obbyProgressV3', JSON.stringify(progress));
+        }
+
+        // ================= Level Configuration =================
         const levelsData = [
-            { // ด่าน 1
+            { 
+                emoji: '🌍', name: 'Earth Orbit',
+                bgUrl: 'https://images.unsplash.com/photo-1534796636912-3652c7435f0f?q=80&w=400&fit=crop',
+                starTargets: [15, 25], // < 15s = 3 stars, < 25s = 2 stars, else 1 star
                 height: 640, spawnX: 40, spawnY: 550,
                 objects: [
                     { x: 0, y: 580, w: 360, h: 60, type: 'ground' },
@@ -176,7 +428,10 @@
                     { x: 140, y: 80, w: 80, h: 15, type: 'goal' }
                 ]
             },
-            { // ด่าน 2
+            { 
+                emoji: '🌕', name: 'Lunar Base',
+                bgUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=400&fit=crop',
+                starTargets: [18, 30],
                 height: 1200, spawnX: 40, spawnY: 1110,
                 objects: [
                     { x: 0, y: 1140, w: 100, h: 60, type: 'ground' },
@@ -193,7 +448,10 @@
                     { x: 140, y: 60, w: 80, h: 15, type: 'goal' }
                 ]
             },
-            { // ด่าน 3
+            { 
+                emoji: '🪐', name: 'Saturn Rings',
+                bgUrl: 'https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?q=80&w=400&fit=crop',
+                starTargets: [25, 40],
                 height: 1800, spawnX: 40, spawnY: 1720,
                 objects: [
                     { x: 0, y: 1750, w: 100, h: 50, type: 'ground' },
@@ -219,36 +477,255 @@
             }
         ];
 
-        function initLevel() {
+        // ================= UI & Screen Management =================
+        function showScreen(screenId) {
+            document.querySelectorAll('.overlay').forEach(el => el.classList.remove('active'));
+            if (screenId) document.getElementById(screenId).classList.add('active');
+            
+            if (screenId === 'levelSelectScreen') {
+                renderLevelSelect();
+                gameState = 'MENU';
+                gameContainer.style.backgroundImage = `url('https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=400&fit=crop')`; 
+            }
+        }
+
+        function renderLevelSelect() {
+            const grid = document.getElementById('levelGrid');
+            grid.innerHTML = '';
+            
+            levelsData.forEach((lvl, idx) => {
+                const isUnlocked = progress[idx] && progress[idx].unlocked;
+                const stars = progress[idx] ? progress[idx].stars : 0;
+                
+                const btn = document.createElement('div');
+                btn.className = `level-card ${isUnlocked ? 'unlocked' : 'locked'}`;
+                
+                let starHtml = '';
+                if(isUnlocked) {
+                    starHtml = (stars >= 1 ? '★' : '☆') + (stars >= 2 ? '★' : '☆') + (stars >= 3 ? '★' : '☆');
+                } else {
+                    starHtml = '🔒';
+                }
+
+                btn.innerHTML = `
+                    <div class="level-info">
+                        <span>${lvl.emoji}</span>
+                        <span>${idx + 1}. ${lvl.name}</span>
+                    </div>
+                    <div class="level-stars">${starHtml}</div>
+                `;
+                
+                if (isUnlocked) {
+                    btn.onclick = () => loadLevel(idx);
+                }
+                grid.appendChild(btn);
+            });
+        }
+
+        function loadLevel(idx) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            currentLevel = idx;
+            showScreen(null); 
+            uiDiv.style.display = 'flex';
+            controlsDiv.style.display = 'flex';
+            
+            let data = levelsData[currentLevel];
+            gameContainer.style.backgroundImage = `url('${data.bgUrl}')`;
+            document.getElementById('uiLevelText').innerText = `${data.emoji} Stage ${currentLevel + 1}`;
+            
+            restartLevel();
+        }
+
+        function goToMenu() {
+            uiDiv.style.display = 'none';
+            controlsDiv.style.display = 'none';
+            particles = []; 
+            showScreen('levelSelectScreen');
+        }
+
+        function restartLevel() {
+            keys.left = false; keys.right = false; keys.jump = false;
             let data = levelsData[currentLevel];
             levelObjects = data.objects.map(obj => ({...obj}));
             player.x = data.spawnX; player.y = data.spawnY;
             player.dx = 0; player.dy = 0; player.currentPlatform = null;
-            levelText.innerText = `Stage ${currentLevel + 1} / 3`;
-            playSound('clear'); 
+            
+            particles = []; 
+            startTime = Date.now();
+            gameState = 'PLAYING';
+            showScreen(null); 
         }
 
-        function startGame() {
-            currentLevel = 0;
-            startTime = Date.now();
-            initLevel();
-            gameState = 'PLAYING';
+        function nextLevel() {
+            if (currentLevel + 1 < levelsData.length) {
+                loadLevel(currentLevel + 1);
+            } else {
+                goToMenu(); 
+            }
+        }
+
+        // ================= Game Logic & Physics =================
+        const player = {
+            x: 0, y: 0, w: 20, h: 20, color: '#00e5ff',
+            dx: 0, dy: 0, speed: 4.5, jumpPower: -12,
+            gravity: 0.45, grounded: false, currentPlatform: null
+        };
+        let levelObjects = []; 
+        let particles = [];
+
+        function spawnConfetti() {
+            for(let i=0; i<60; i++) {
+                particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2 + cameraY, 
+                    vx: (Math.random() - 0.5) * 15,
+                    vy: (Math.random() - 0.5) * 15,
+                    life: 1.0,
+                    color: ['#00e5ff', '#ff007f', '#ffd700', '#fff'][Math.floor(Math.random()*4)],
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        const keys = { left: false, right: false, jump: false };
+        const bindKey = (e, state) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = state;
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = state;
+            if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.jump = state;
+        };
+        window.addEventListener('keydown', e => bindKey(e, true));
+        window.addEventListener('keyup', e => bindKey(e, false));
+
+        const setupBtn = (id, key) => {
+            const btn = document.getElementById(id);
+            const setTrue = (e) => { e.preventDefault(); keys[key] = true; };
+            const setFalse = (e) => { e.preventDefault(); keys[key] = false; };
+            btn.addEventListener('mousedown', setTrue);
+            btn.addEventListener('mouseup', setFalse);
+            btn.addEventListener('mouseleave', setFalse);
+            btn.addEventListener('touchstart', setTrue, {passive: false});
+            btn.addEventListener('touchend', setFalse, {passive: false});
+            btn.addEventListener('touchcancel', setFalse, {passive: false});
+        };
+        setupBtn('btnLeft', 'left'); setupBtn('btnRight', 'right'); setupBtn('btnJump', 'jump');
+
+        function triggerStageClear() {
+            // 1. Calculate Stats
+            let targets = levelsData[currentLevel].starTargets;
+            let earnedStars = 1;
+            if (totalElapsedTime <= targets[0]) earnedStars = 3;
+            else if (totalElapsedTime <= targets[1]) earnedStars = 2;
+
+            // 2. Check for New Unlock
+            let nextLevelIdx = currentLevel + 1;
+            let isNewUnlock = false;
+
+            if (!progress[currentLevel]) progress[currentLevel] = { unlocked: true, stars: 0 };
+            progress[currentLevel].stars = Math.max(progress[currentLevel].stars, earnedStars);
+            
+            if (nextLevelIdx < levelsData.length) {
+                if (!progress[nextLevelIdx] || !progress[nextLevelIdx].unlocked) {
+                    isNewUnlock = true;
+                    if (!progress[nextLevelIdx]) progress[nextLevelIdx] = { unlocked: true, stars: 0 };
+                    else progress[nextLevelIdx].unlocked = true;
+                }
+            }
+            saveProgress();
+
+            // 3. Save stats for the next screen
+            tempClearStats = { time: totalElapsedTime, stars: earnedStars, targets: targets };
+
+            // 4. Route to correct screen
+            if (isNewUnlock) {
+                playUnlockCinematic();
+            } else {
+                showStageClearStats();
+            }
+        }
+
+        // --- Cinematic Logic ---
+        function playUnlockCinematic() {
+            gameState = 'UNLOCK_SCENE';
+            uiDiv.style.display = 'none';
+            controlsDiv.style.display = 'none';
+            
+            const wrapper = document.getElementById('padlockWrapper');
+            const text = document.getElementById('unlockText');
+            const btn = document.getElementById('btnContinueUnlock');
+            
+            // Reset state
+            wrapper.className = 'padlock-wrapper shaking';
+            text.style.opacity = '0';
+            btn.style.opacity = '0';
+            btn.style.pointerEvents = 'none';
+            
+            showScreen('unlockScreen');
+            
+            // Play intense rumbling
+            let shakeInterval = setInterval(() => playSound('shake'), 100);
+
+            // Pop unlock after 1.5 seconds
+            setTimeout(() => {
+                clearInterval(shakeInterval);
+                wrapper.className = 'padlock-wrapper unlocking';
+                playSound('padlock_open');
+                
+                text.style.opacity = '1';
+                
+                setTimeout(() => {
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
+                }, 1000); // Wait 1 sec before letting them click continue
+                
+            }, 1500); 
+        }
+
+        function showStageClearStats() {
+            gameState = 'STAGE_CLEAR';
+            uiDiv.style.display = 'none';
+            controlsDiv.style.display = 'none';
+            
+            playSound('clear');
+            spawnConfetti();
+            
+            let stats = tempClearStats;
+
+            // Show UI
+            document.getElementById('clearTimeDisplay').innerText = stats.time.toFixed(2) + 's';
+            document.getElementById('starHintText').innerText = `Target: ${stats.targets[0]}s (3★) / ${stats.targets[1]}s (2★)`;
+            
+            // Hide next button if last stage
+            document.getElementById('btnNextLevel').style.display = (currentLevel + 1 < levelsData.length) ? 'block' : 'none';
+            
+            showScreen('stageClearScreen');
+
+            // Animate Stars Pop
+            const starsSpans = [document.getElementById('star1'), document.getElementById('star2'), document.getElementById('star3')];
+            starsSpans.forEach(s => s.className = ''); // reset
+            
+            for(let i=0; i<stats.stars; i++) {
+                setTimeout(() => {
+                    starsSpans[i].className = 'earned';
+                    playSound('star');
+                }, 500 + (i * 300)); 
+            }
         }
 
         function update() {
-            if (gameState !== 'PLAYING') {
-                if (keys.jump && gameState !== 'MENU' && gameState !== 'GAME_CLEAR') {
-                    if (gameState === 'GAMEOVER') startGame();
-                    else if (gameState === 'STAGE_CLEAR') {
-                        currentLevel++; initLevel(); gameState = 'PLAYING';
-                    }
-                    keys.jump = false;
-                }
-                return;
+            // Update particles regardless of state
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.vy += 0.2; 
+                p.life -= 0.01;
+                if (p.life <= 0) particles.splice(i, 1);
             }
 
+            if (gameState !== 'PLAYING') return;
+
             totalElapsedTime = (Date.now() - startTime) / 1000;
-            timerText.innerText = `Time: ${totalElapsedTime.toFixed(2)}s`;
+            document.getElementById('uiTimerText').innerText = totalElapsedTime.toFixed(2) + 's';
+            
             let lvlData = levelsData[currentLevel];
 
             for (let rect of levelObjects) {
@@ -262,9 +739,7 @@
             else if (keys.right) player.dx = player.speed;
             else player.dx = 0;
 
-            if (player.currentPlatform && player.currentPlatform.moving) {
-                player.dx += player.currentPlatform.speedX;
-            }
+            if (player.currentPlatform && player.currentPlatform.moving) player.dx += player.currentPlatform.speedX;
 
             if (keys.jump && player.grounded) {
                 player.dy = player.jumpPower; player.grounded = false; player.currentPlatform = null; playSound('jump');
@@ -272,38 +747,27 @@
 
             player.dy += player.gravity; player.x += player.dx; player.y += player.dy;
 
+            // Boundaries
             if (player.x < 0) player.x = 0;
             if (player.x + player.w > canvas.width) player.x = canvas.width - player.w;
-            if (player.y > lvlData.height + 50) { playSound('death'); gameState = 'GAMEOVER'; }
+            if (player.y > lvlData.height + 50) { 
+                playSound('death'); 
+                gameState = 'GAMEOVER'; 
+                showScreen('gameOverScreen');
+            }
 
             let wasGrounded = player.grounded;
             player.grounded = false; player.currentPlatform = null;
 
+            // Collisions
             for (let rect of levelObjects) {
                 if (player.x < rect.x + rect.w && player.x + player.w > rect.x &&
                     player.y < rect.y + rect.h && player.y + player.h > rect.y) {
                     
                     if (rect.type === 'lava') {
-                        playSound('death'); gameState = 'GAMEOVER';
+                        playSound('death'); gameState = 'GAMEOVER'; showScreen('gameOverScreen');
                     } else if (rect.type === 'goal') {
-                        if (currentLevel < levelsData.length - 1) {
-                            playSound('clear'); gameState = 'STAGE_CLEAR';
-                        } else {
-                            playSound('win');
-                            let timePenalty = Math.floor(totalElapsedTime * 100);
-                            finalScore = Math.max(0, 30000 - timePenalty);
-                            
-                            // นำข้อมูลไปแสดงในหน้า End Screen
-                            document.getElementById('finalTimeDisplay').innerText = `${totalElapsedTime.toFixed(2)}s`;
-                            document.getElementById('finalScoreDisplay').innerText = finalScore.toLocaleString();
-                            
-                            // ซ่อน UI สลับไปแสดงหน้า End Screen
-                            uiDiv.style.display = 'none';
-                            controlsDiv.style.display = 'none';
-                            endScreen.style.display = 'flex';
-                            
-                            gameState = 'GAME_CLEAR';
-                        }
+                        triggerStageClear();
                     } else if (rect.type === 'ground') {
                         if (player.dy > 0 && (player.y + player.h - player.dy) <= rect.y + 12) {
                             player.grounded = true; player.currentPlatform = rect; player.dy = 0; player.y = rect.y - player.h;
@@ -315,78 +779,70 @@
                 }
             }
 
+            // Camera follow
             let targetCameraY = player.y - canvas.height / 2;
             targetCameraY = Math.max(0, Math.min(targetCameraY, lvlData.height - canvas.height));
             cameraY += (targetCameraY - cameraY) * 0.1;
         }
 
         function draw() {
-            // วาดพื้นหลัง Gradient อวกาศ
-            let bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            bgGradient.addColorStop(0, '#0f0c29');
-            bgGradient.addColorStop(0.5, '#302b63');
-            bgGradient.addColorStop(1, '#111');
-            ctx.fillStyle = bgGradient;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            if (gameState === 'MENU' || gameState === 'GAME_CLEAR') return;
-
-            // วาดดวงดาว (Parallax Effect เลื่อนช้ากว่ากล้อง)
-            stars.forEach(star => {
-                let screenY = (star.y - cameraY * 0.3) % 2000;
-                if (screenY < 0) screenY += 2000;
-                if (screenY < canvas.height) {
-                    ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
-                    ctx.fillRect(star.x, screenY, star.size, star.size);
-                }
-            });
+            if (gameState === 'START' || gameState === 'MENU') return;
 
             ctx.save();
             ctx.translate(0, -cameraY);
 
-            // วาดเส้นประแสดงกริดอวกาศ
-            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-            ctx.beginPath();
-            for(let i = 0; i <= levelsData[currentLevel].height; i += 100) { ctx.moveTo(0, i); ctx.lineTo(360, i); }
-            ctx.stroke();
-
             for (let rect of levelObjects) {
-                if (rect.type === 'ground') ctx.fillStyle = rect.moving ? '#7b8da3' : '#4e5a66';
-                if (rect.type === 'lava') ctx.fillStyle = rect.moving ? '#ff1100' : '#d93838';
+                if (rect.type === 'ground') ctx.fillStyle = rect.moving ? '#444' : '#222';
+                if (rect.type === 'lava') ctx.fillStyle = rect.moving ? '#ff007f' : '#b30059'; 
+                
                 if (rect.type === 'goal') {
                     ctx.fillStyle = '#ffd700';
-                    ctx.shadowBlur = 20; ctx.shadowColor = '#ffd700'; // เพิ่มแสงเงาให้เส้นชัย
+                    ctx.shadowBlur = 20; ctx.shadowColor = '#ffd700'; 
+                } else if (rect.type === 'lava') {
+                    ctx.shadowBlur = 10; ctx.shadowColor = '#ff007f';
                 }
+                
                 ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-                ctx.shadowBlur = 0; // รีเซ็ตเงา
+                ctx.shadowBlur = 0; 
                 
                 if(rect.type === 'ground') {
-                    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-                    ctx.fillRect(rect.x, rect.y, rect.w, 4); // ขอบ 3D ด้านบนแท่น
+                    ctx.strokeStyle = rect.moving ? '#00e5ff' : '#0088aa';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+                    ctx.fillStyle = 'rgba(0, 229, 255, 0.1)';
+                    ctx.fillRect(rect.x, rect.y, rect.w, 4); 
                 }
             }
 
-            // วาดตัวละคร
             ctx.fillStyle = player.color;
             ctx.shadowBlur = 15; ctx.shadowColor = player.color;
             ctx.fillRect(player.x, player.y, player.w, player.h);
             ctx.shadowBlur = 0;
-            ctx.restore();
 
-            ctx.textAlign = 'center';
-            if (gameState === 'GAMEOVER') {
-                ctx.fillStyle = 'rgba(20, 0, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ff4444'; ctx.font = 'bold 40px Arial'; ctx.fillText('WASTED!', canvas.width/2, 300);
-                ctx.fillStyle = 'white'; ctx.font = '16px Arial'; ctx.fillText('Tap JUMP to Restart Stage', canvas.width/2, 340);
-            } else if (gameState === 'STAGE_CLEAR') {
-                ctx.fillStyle = 'rgba(0, 50, 0, 0.7)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#00ff88'; ctx.font = 'bold 36px Arial'; ctx.fillText('STAGE CLEARED!', canvas.width/2, 300);
-                ctx.fillStyle = 'white'; ctx.font = '16px Arial'; ctx.fillText('Tap JUMP for Next Stage', canvas.width/2, 340);
-            }
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            });
+
+            ctx.restore();
         }
 
-        function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
-        gameLoop();
+        function gameLoop() { 
+            update(); 
+            draw(); 
+            requestAnimationFrame(gameLoop); 
+        }
+        
+        gameLoop(); 
     </script>
 </body>
 </html>
